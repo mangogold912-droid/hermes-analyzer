@@ -13,7 +13,7 @@ class FileManager(private val contentResolver: ContentResolver) {
         const val MAX_MEMORY_SIZE = 50 * 1024 * 1024 // 50MB in-memory
     }
 
-    // 무제한 크기 파일 읽기 (chunked)
+    // Unlimited file size reading (chunked)
     fun readLargeFile(uri: Uri, callback: (ByteArray, Long, Long) -> Unit) {
         contentResolver.openInputStream(uri)?.use { input ->
             val totalSize = getFileSize(uri)
@@ -31,7 +31,7 @@ class FileManager(private val contentResolver: ContentResolver) {
         }
     }
 
-    // 파일 크기 확인
+    // Check file size
     fun getFileSize(uri: Uri): Long {
         return try {
             contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -43,7 +43,7 @@ class FileManager(private val contentResolver: ContentResolver) {
         } catch (_: Exception) { -1 }
     }
 
-    // 스트리밍 해시 계산 (SHA-256, 메모리에 전체 로드하지 않음)
+    // Streaming hash (SHA-256, no full memory load)
     fun computeStreamingHash(uri: Uri): String {
         val md = java.security.MessageDigest.getInstance("SHA-256")
         contentResolver.openInputStream(uri)?.use { input ->
@@ -57,7 +57,7 @@ class FileManager(private val contentResolver: ContentResolver) {
         return md.digest().joinToString("") { "%02x".format(it) }
     }
 
-    // 외부 저장소 모든 파일 접근 (Android 11+)
+    // External storage full access (Android 11+)
     fun getAllFilesFromExternalStorage(): List<File> {
         val files = mutableListOf<File>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -73,7 +73,7 @@ class FileManager(private val contentResolver: ContentResolver) {
         return files
     }
 
-    // SAF (Storage Access Framework)를 통한 모든 파일 접근
+    // All file access via SAF
     fun requestAllFilesAccess(): Intent {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
