@@ -14,8 +14,6 @@ class IDAMCPClient {
         private const val DEFAULT_PORT = 8080
         private const val DEFAULT_HOST = "localhost"
         private const val TIMEOUT_MS = 30000L
-    }
-
     private var socket: Socket? = null
     private var reader: BufferedReader? = null
     private var writer: PrintWriter? = null
@@ -56,8 +54,6 @@ class IDAMCPClient {
         try { socket?.close() } catch (_: Exception) {}
         socket = null
         log("Disconnected")
-    }
-
     fun isConnected(): Boolean = isConnected.get()
 
     // === Static Analysis Commands ===
@@ -74,8 +70,6 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     fun getStrings(filePath: String, minLen: Int = 4): List<ExtractedString> {
         return sendCommand("get_strings", mapOf("file_path" to filePath, "min_length" to minLen))
             ?.optJSONArray("result")?.let { arr ->
@@ -87,8 +81,6 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     fun getSegments(filePath: String): List<Map<String, String>> {
         return sendCommand("get_segments", mapOf("file_path" to filePath))
             ?.optJSONArray("result")?.let { arr ->
@@ -102,13 +94,9 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     fun decompileFunction(address: String): String {
         return sendCommand("decompile_function", mapOf("address" to address))
             ?.optString("result", "") ?: ""
-    }
-
     fun getCallGraph(filePath: String): Map<String, List<String>> {
         val result = sendCommand("get_call_graph", mapOf("file_path" to filePath))
         val nodes = mutableListOf<String>()
@@ -128,16 +116,12 @@ class IDAMCPClient {
             }
         }
         return edges
-    }
-
     // === Dynamic Analysis Commands ===
 
     fun startTracing(filePath: String, config: Map<String, Any> = emptyMap()): String? {
         val params = mutableMapOf<String, Any>("file_path" to filePath)
         params.putAll(config)
         return sendCommand("start_tracing", params)?.optString("session_id")
-    }
-
     fun getSyscalls(sessionId: String): List<Map<String, String>> {
         return sendCommand("get_syscalls", mapOf("session_id" to sessionId))
             ?.optJSONArray("result")?.let { arr ->
@@ -150,8 +134,6 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     fun getMemoryMap(sessionId: String): List<Map<String, String>> {
         return sendCommand("get_memory_map", mapOf("session_id" to sessionId))
             ?.optJSONArray("result")?.let { arr ->
@@ -165,8 +147,6 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     // === Vulnerability Scanning ===
 
     fun scanVulnerabilities(filePath: String): List<Vulnerability> {
@@ -184,15 +164,11 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     fun getXrefs(address: String): List<String> {
         return sendCommand("get_xrefs", mapOf("address" to address))
             ?.optJSONArray("result")?.let { arr ->
                 (0 until arr.length()).map { arr.getString(i) }
             } ?: emptyList()
-    }
-
     fun getImports(filePath: String): List<Map<String, String>> {
         return sendCommand("get_imports", mapOf("file_path" to filePath))
             ?.optJSONArray("result")?.let { arr ->
@@ -205,8 +181,6 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     fun getExports(filePath: String): List<Map<String, String>> {
         return sendCommand("get_exports", mapOf("file_path" to filePath))
             ?.optJSONArray("result")?.let { arr ->
@@ -219,14 +193,10 @@ class IDAMCPClient {
                     )
                 }
             } ?: emptyList()
-    }
-
     fun readMemory(address: Long, size: Int): ByteArray? {
         val result = sendCommand("read_memory", mapOf("address" to address, "size" to size))
         val hex = result?.optString("data") ?: return null
         return hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    }
-
     // === Private ===
 
     private fun sendCommand(method: String, params: Map<String, Any>): JSONObject? {
@@ -245,13 +215,11 @@ class IDAMCPClient {
 
             // Wait for response with timeout
             var response: JSONObject? = null
-            val latch = Object()
+            val latch = java.util.concurrent.CountDownLatch(1)
             pendingRequests[id] = { resp ->
                 response = resp
-                synchronized(latch) { latch.notify() }
-            }
-
-            synchronized(latch) {
+                latch.countDown()
+            latch.await(TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
                 latch.wait(TIMEOUT_MS)
             }
             pendingRequests.remove(id)
@@ -289,8 +257,6 @@ class IDAMCPClient {
             log("Read loop error: ${e.message}")
         }
         isConnected.set(false)
-    }
-
     private fun log(msg: String) {
         Log.d(TAG, msg)
         onLog?.invoke(msg)

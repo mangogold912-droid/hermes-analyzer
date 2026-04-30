@@ -6,7 +6,10 @@ import androidx.appcompat.app.AppCompatActivity
 class FilePickerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        // Delegates to MainActivity for file picking
+        val intent = android.content.Intent(this, MainActivity::class.java)
+        intent.putExtra("openPicker", true)
+        startActivity(intent)
         finish()
     }
 }

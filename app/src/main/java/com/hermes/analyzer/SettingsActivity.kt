@@ -1,7 +1,9 @@
+import androidx.appcompat.app.AlertDialog
 package com.hermes.analyzer
 
 import android.os.Bundle
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.hermes.analyzer.ai.AIMultiEngine
 
