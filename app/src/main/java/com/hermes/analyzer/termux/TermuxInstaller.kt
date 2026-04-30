@@ -53,20 +53,20 @@ object TermuxInstaller {
             pkg update -y
             pkg install -y wget curl python python-pip openssh git
 
-            # proot-distro 설치 (Debian chroot)
+            # proot-distro install (Debian chroot)
             pkg install -y proot-distro
             proot-distro install debian
 
-            # Debian 안에 IDA Pro Linux 설치
+            # Install IDA Pro Linux in Debian
             echo "Debian 환경 설정 중..."
             proot-distro login debian -- bash -c '
                 apt update
                 apt install -y wget curl python3 python3-pip ssh
 
-                # IDA Pro MCP 서버 설치
+                # Install IDA Pro MCP server
                 pip3 install ida-pro-mcp
 
-                # MCP 서버 시작 스크립트
+                # MCP server start script
                 cat > /start_mcp.sh << EOF
 #!/bin/bash
 echo "Starting IDA Pro MCP Server..."
@@ -84,7 +84,7 @@ EOF
         val scriptFile = File(context.filesDir, "setup_ida.sh")
         scriptFile.writeText(script)
 
-        // Termux에 전달
+        // Send to Termux
         val intent = Intent("com.termux.RUN_COMMAND").apply {
             setPackage("com.termux")
             putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
