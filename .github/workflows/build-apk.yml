@@ -31,10 +31,13 @@ jobs:
 
     - run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
 
-    - run: find . -name "*.apk" -type f
-
-    - run: ls -laR app/build/outputs/ 2>/dev/null || echo "No outputs"
-      if: always()
+    - name: Find APK
+      id: find_apk
+      run: |
+        APK_PATH=$(find app/build -name "*.apk" | head -1)
+        echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+        echo "Found APK: $APK_PATH"
+        ls -lh "$APK_PATH" 2>/dev/null || echo "File not accessible"
 
     - uses: actions/upload-artifact@v4
       if: always()
@@ -45,17 +48,27 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: HermesAnalyzer-Debug
-        path: app/build/**/*.apk
+        path: ${{ steps.find_apk.outputs.apk_path }}
         if-no-files-found: warn
 
-    - name: Create Release
-      if: github.ref == 'refs/heads/main'
-      run: |
-        APK=$(find app/build -name "*.apk" | head -1)
-        if [ -n "$APK" ]; then
-          gh release create "v${GITHUB_RUN_NUMBER}" "$APK" --repo "$GITHUB_REPOSITORY" --title "Hermes Analyzer v${GITHUB_RUN_NUMBER}" --notes "Build ${GITHUB_RUN_NUMBER}"
-        else
-          echo "No APK found for release"
-        fi
+    - name: Release
+      if: github.ref == 'refs/heads/main' && steps.find_apk.outputs.apk_path != ''
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ steps.find_apk.outputs.apk_path }}
+        tag_name: v${{ github.run_number }}
+        name: Hermes Analyzer v${{ github.run_number }}
+        generate_release_notes: false
+        body: |
+          ## Hermes Analyzer v${{ github.run_number }}
+
+          ### Features
+          - 50 Reverse Engineering Plugins (RE Discord Community Tools)
+          - C++ Native Disassembler (Capstone) - ARM64/ARM/x86/x64
+          - IDA Pro MCP Server Integration
+          - 8 AI Platforms Parallel Analysis (OpenAI, Kimi, Qwen, Gemini, Claude, DeepSeek, Ollama, Suprninja)
+          - AI Chat with Memory & Auto-Plugin Execution
+          - Built-in Terminal (xterm.js) with Auto-Execution
+          - MANAGE_EXTERNAL_STORAGE (All files access)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
