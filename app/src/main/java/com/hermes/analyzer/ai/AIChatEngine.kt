@@ -9,11 +9,11 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * AI 채팅 엔진 -- 메모리/컨텍스트 기반
+ * AI AIChatEngine -- memory/context based
  *
- * - SQLite로 대화 히스토리 저장
- * - 컨텍스트 윈도우 관리 (최근 N개 메시지)
- * - 플러그인 연동 (AI가 플러그인을 자동 실행)
+ * - SQLite conversation history storage
+ * - Context window management (recent N messages)
+ * - Plugin integration (AI automatically executes plugins)
  */
 class AIChatEngine(context: Context) {
 
@@ -34,7 +34,7 @@ class AIChatEngine(context: Context) {
     )
 
     /**
-     * 메시지 전송 + AI 응답 생성
+     * Send message + generate AI response
      */
     fun sendMessage(userMessage: String): ChatMessage {
         db.saveMessage("user", userMessage)
@@ -47,7 +47,7 @@ class AIChatEngine(context: Context) {
     }
 
     /**
-     * 키워드 분석 -> 플러그인 자동 실행
+     * Keyword analysis -> plugin auto-execution
      */
     private fun autoExecutePlugins(userMessage: String): List<String> {
         val lower = userMessage.lowercase()
@@ -140,7 +140,34 @@ class AIChatEngine(context: Context) {
             "windows" to listOf("x64dbg_bridge", "ollydbg_debugger"),
             "web" to listOf("burp_zap_proxy"),
             "packet" to listOf("wireshark_analyzer"),
-            "traffic" to listOf("wireshark_analyzer")
+            "traffic" to listOf("wireshark_analyzer"),
+
+            // ==== 7 ADDITIONAL KEYWORD MAPPINGS ====
+            "fox" to listOf("ghidra_fox"),
+            "federicodotta" to listOf("ghidra_fox"),
+            "objc" to listOf("ida_objc_types"),
+            "objective-c" to listOf("ida_objc_types"),
+            "ios types" to listOf("ida_objc_types"),
+            "poomsmart" to listOf("ida_objc_types"),
+            "heresy" to listOf("heresy_react_native"),
+            "react native" to listOf("heresy_react_native"),
+            "rn" to listOf("heresy_react_native"),
+            "pilfer" to listOf("heresy_react_native"),
+            "edbg" to listOf("edbg_ebpf"),
+            "ebpf debug" to listOf("edbg_ebpf"),
+            "shinoLeah" to listOf("edbg_ebpf"),
+            "bpfroid" to listOf("bpfroid_trace"),
+            "ebpf trace" to listOf("bpfroid_trace"),
+            "yanivagman" to listOf("bpfroid_trace"),
+            "syscall" to listOf("bpfroid_trace", "edbg_ebpf"),
+            "reflutter" to listOf("reflutter_ssl"),
+            "flutter" to listOf("reflutter_ssl"),
+            "ssl pinning" to listOf("reflutter_ssl"),
+            "dart" to listOf("reflutter_ssl"),
+            "coruna" to listOf("coruna_ios"),
+            "ios exploit" to listOf("coruna_ios"),
+            "jailbreak" to listOf("coruna_ios"),
+            "exploit kit" to listOf("coruna_ios")
         )
 
         for ((keyword, pluginIds) in keywordMap) {
@@ -160,7 +187,7 @@ class AIChatEngine(context: Context) {
     }
 
     /**
-     * AI 응답 생성
+     * AI response generation
      */
     private fun generateResponse(
         userMessage: String,
@@ -169,7 +196,7 @@ class AIChatEngine(context: Context) {
     ): String {
         val sb = StringBuilder()
 
-        // 플러그인 실행 결과가 있으면 먼저 표시
+        // Show plugin execution results first if present
         if (pluginResults.isNotEmpty()) {
             sb.append("**Analysis Results:**\n\n")
             for (result in pluginResults) {
@@ -177,10 +204,10 @@ class AIChatEngine(context: Context) {
             }
         }
 
-        // 컨텍스트 기반 응답
+        // Context-based response
         val lower = userMessage.lowercase()
 
-        // 인사
+        // Greeting
         if (lower.contains("hello") || lower.contains("hi ") || lower.contains("hey")) {
             sb.append("Hello! I'm **Hermes AI**, your advanced reverse engineering assistant. I can:\n\n")
             sb.append("- Analyze binaries (ELF, PE, DEX, APK)\n")
@@ -193,7 +220,7 @@ class AIChatEngine(context: Context) {
             return sb.toString()
         }
 
-        // 파일 분석 요청
+        // File analysis request
         if (lower.contains("analyze") || lower.contains("file") || lower.contains("binary")) {
             sb.append("I'll analyze the target file systematically. Here's my approach:\n\n")
             sb.append("1. **File Type Detection** - Identify format (ELF/PE/DEX/APK)\n")
@@ -209,37 +236,37 @@ class AIChatEngine(context: Context) {
             return sb.toString()
         }
 
-        // 도움 요청
+        // Help request
         if (lower.contains("help") || lower.contains("what can you do")) {
             sb.append("## Available Capabilities\n\n")
 
-            // Binary Analysis (14 plugins)
-            sb.append("**Binary Analysis (14):**\n")
+            // Binary Analysis (13 plugins)
+            sb.append("**Binary Analysis (13):**\n")
             sb.append("- ELF Analyzer: Headers, sections, symbols, relocations\n")
             sb.append("- Capstone Disasm: ARM/x86 disassembly engine\n")
             sb.append("- Binary Ninja: Advanced binary analysis platform\n")
             sb.append("- Ghidra Analyzer: NSA reverse engineering suite\n")
+            sb.append("- Ghidra Fox: iOS/macOS Ghidra scripts (Federico Dotta)\n")
             sb.append("- Cutter/Rizin: Open-source reverse engineering GUI\n")
-            sb.append("- JADX Decompiler: Android Java decompiler\n")
             sb.append("- dnSpy Decompiler: .NET assembly decompiler\n")
             sb.append("- Detect It Easy: Packer/compiler identifier\n")
             sb.append("- PE Bear: Portable Executable file analyzer\n")
             sb.append("- BinDiff Compare: Binary diffing and comparison\n")
-            sb.append("- Apktool Engine: APK reverse engineering\n")
             sb.append("- ImHex Editor: Hex pattern visualization editor\n")
             sb.append("- IDA MCP Bridge: IDA Pro integration bridge\n")
             sb.append("- Radare2 Wrapper: Command-line reverse framework\n\n")
 
-            // Security (5 plugins)
-            sb.append("**Security (5):**\n")
+            // Security (6 plugins)
+            sb.append("**Security (6):**\n")
             sb.append("- YARA Scanner: Malware pattern detection\n")
             sb.append("- Vuln Scanner: CVE, overflow, injection checks\n")
             sb.append("- Crypto Hunter: Find AES, RSA, hash algorithms\n")
             sb.append("- CAPA/FLOSS: Capability extraction and string deobfuscation\n")
-            sb.append("- Quark Engine: Android malware scoring\n\n")
+            sb.append("- Quark Engine: Android malware scoring\n")
+            sb.append("- Coruna iOS: iOS exploitation and jailbreak toolkit\n\n")
 
-            // Android (8 plugins)
-            sb.append("**Android (8):**\n")
+            // Mobile / Android (11 plugins)
+            sb.append("**Mobile / Android (11):**\n")
             sb.append("- APK Deep Scan: Permissions, components, native libs\n")
             sb.append("- DEX Decompiler: Dalvik bytecode decompilation\n")
             sb.append("- JNI Analyzer: Native method call analysis\n")
@@ -247,22 +274,26 @@ class AIChatEngine(context: Context) {
             sb.append("- JADX Decompiler: Android Java decompiler\n")
             sb.append("- Apktool Engine: APK reverse engineering\n")
             sb.append("- Objection Tool: Runtime mobile exploration\n")
-            sb.append("- MobSF Scanner: Mobile security framework\n\n")
+            sb.append("- MobSF Scanner: Mobile security framework\n")
+            sb.append("- Heresy React Native: React Native analysis and deobfuscation\n")
+            sb.append("- ReFlutter SSL: Flutter SSL pinning bypass tool\n")
+            sb.append("- IDA ObjC Types: Objective-C/iOS type parser for IDA (PoomSmart)\n\n")
 
             // Network (4 plugins)
             sb.append("**Network (4):**\n")
             sb.append("- Network Analyzer: URLs, protocols, SSL pinning\n")
             sb.append("- Wireshark Analyzer: PCAP and traffic analysis\n")
             sb.append("- Burp/ZAP Proxy: Web interception proxy\n")
-            sb.append("- Vuln Scanner: Network vulnerability assessment\n\n")
+            sb.append("- BPFroid Trace: eBPF Android syscall tracer (yanivagman)\n\n")
 
-            // Debuggers (5 plugins)
-            sb.append("**Debuggers (5):**\n")
+            // Debuggers (6 plugins)
+            sb.append("**Debuggers (6):**\n")
             sb.append("- x64dbg Bridge: Windows user-mode debugger\n")
             sb.append("- OllyDbg Debugger: Legacy 32-bit debugger\n")
             sb.append("- Immunity Debugger: Exploit development debugger\n")
             sb.append("- WinDbg Analyzer: Windows kernel debugger\n")
-            sb.append("- GDB/LLDB Bridge: GNU and LLVM debugger bridge\n\n")
+            sb.append("- GDB/LLDB Bridge: GNU and LLVM debugger bridge\n")
+            sb.append("- eDBG eBPF: eBPF-based kernel debugger (shinoLeah)\n\n")
 
             // Emulation (4 plugins)
             sb.append("**Emulation (4):**\n")
@@ -277,18 +308,17 @@ class AIChatEngine(context: Context) {
             sb.append("- Manticore SE: Symbolic execution tool\n")
             sb.append("- Triton Engine: Dynamic binary analysis\n\n")
 
-            // Utilities (4 plugins)
-            sb.append("**Utilities (4):**\n")
+            // Utilities (3 plugins)
+            sb.append("**Utilities (3):**\n")
             sb.append("- QBDI Tracer: Dynamic binary instrumentation tracer\n")
             sb.append("- BinSync Collab: Reverse engineering collaboration\n")
-            sb.append("- BinDiff Compare: Binary diffing and comparison\n")
             sb.append("- String Extractor: All strings with categorization\n\n")
 
             sb.append("Just type what you want to analyze!")
             return sb.toString()
         }
 
-        // 플러그인 결과가 있는 경우
+        // When plugin results are present
         if (pluginResults.isNotEmpty()) {
             sb.append("Based on the automated analysis above, I've identified several areas of interest. ")
             sb.append("The analysis used ").append(pluginResults.size).append(" plugin(s) based on your query keywords.\n\n")
@@ -300,7 +330,7 @@ class AIChatEngine(context: Context) {
             return sb.toString()
         }
 
-        // 기본 응답
+        // Default response
         sb.append("I'm analyzing your request...\n\n")
         sb.append("To provide the best assistance, could you clarify:\n")
         sb.append("- What **type of file** are you analyzing? (ELF, APK, DEX, etc.)\n")
@@ -312,17 +342,17 @@ class AIChatEngine(context: Context) {
     }
 
     /**
-     * 히스토리 가져오기
+     * Get history
      */
     fun getHistory(limit: Int = 100): List<ChatMessage> = db.getRecentMessages(limit)
 
     /**
-     * 히스토리 삭제
+     * Clear history
      */
     fun clearHistory() = db.clearAll()
 
     /**
-     * SQLite 데이터베이스
+     * SQLite database
      */
     class ChatDatabase(context: Context) : SQLiteOpenHelper(context, "hermes_chat.db", null, 1) {
 
@@ -336,7 +366,7 @@ class AIChatEngine(context: Context) {
                     plugin_used TEXT
                 )
             """)
-            // 인덱스 생성
+            // Create index
             db.execSQL("CREATE INDEX idx_timestamp ON messages(timestamp)")
         }
 
