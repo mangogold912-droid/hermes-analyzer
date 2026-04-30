@@ -6,7 +6,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -15,11 +17,16 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.hermes.analyzer.ai.AIMultiEngine
 import com.hermes.analyzer.db.AnalysisDatabase
+import com.hermes.analyzer.ml.ReinforcementLearning
 import com.hermes.analyzer.model.*
 import com.hermes.analyzer.network.IDAMCPClient
+import com.hermes.analyzer.termux.TermuxInstaller
 import com.hermes.analyzer.utils.BinaryAnalyzer
+import com.hermes.analyzer.utils.FileManager
+import com.hermes.analyzer.utils.NativeBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -30,6 +37,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var aiEngine: AIMultiEngine
     private lateinit var idaClient: IDAMCPClient
     private lateinit var analyzer: BinaryAnalyzer
+    private lateinit var fileManager: FileManager
+    private lateinit var rl: ReinforcementLearning
+    private lateinit var nativeBridge: NativeBridge
 
     private lateinit var tvStatus: TextView
     private lateinit var tvLog: TextView
@@ -39,6 +49,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnAnalyze: Button
     private lateinit var btnChat: Button
     private lateinit var btnSettings: Button
+    private lateinit var btnTermux: Button
+    private lateinit var btnAllFiles: Button
     private lateinit var tvFileInfo: TextView
 
     private var selectedFile: File? = null
@@ -47,6 +59,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQ_STORAGE = 100
         private const val REQ_PICK_FILE = 101
+        private const val REQ_ALL_FILES = 102
+        private const val REQ_TERMUX = 103
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,9 +71,13 @@ class MainActivity : AppCompatActivity() {
         aiEngine = AIMultiEngine(this)
         idaClient = IDAMCPClient()
         analyzer = BinaryAnalyzer()
+        fileManager = FileManager(contentResolver)
+        rl = ReinforcementLearning(this)
+        nativeBridge = NativeBridge()
 
         initViews()
         checkPermissions()
+        checkAllFilesPermission()
 
         idaClient.onProgress = { percent, msg ->
             runOnUiThread {
@@ -76,10 +94,20 @@ class MainActivity : AppCompatActivity() {
         }
 
         aiEngine.onResult = { platform, result ->
-            runOnUiThread { appendLog("[$platform] confidence=${(result.confidence * 100).toInt()}%") }
+            runOnUiThread {
+                appendLog("[$platform] confidence=${(result.confidence * 100).toInt()}%")
+            }
         }
 
         loadRecentFiles()
+        showWelcomeMessage()
+    }
+
+    private fun showWelcomeMessage() {
+        appendLog("=== Hermes Analyzer ===")
+        appendLog("IDA Pro MCP + 8 AI + Native Engine + RL")
+        appendLog("All file access: ${Environment.isExternalStorageManager()}")
+        appendLog("Native bridge loaded: OK")
     }
 
     private fun initViews() {
@@ -91,6 +119,8 @@ class MainActivity : AppCompatActivity() {
         btnAnalyze = findViewById(R.id.btnAnalyze)
         btnChat = findViewById(R.id.btnChat)
         btnSettings = findViewById(R.id.btnSettings)
+        btnTermux = findViewById(R.id.btnTermux)
+        btnAllFiles = findViewById(R.id.btnAllFiles)
         tvFileInfo = findViewById(R.id.tvFileInfo)
 
         btnSelectFile.setOnClickListener { pickFile() }
@@ -98,6 +128,8 @@ class MainActivity : AppCompatActivity() {
         btnAnalyze.setOnClickListener { startAnalysis() }
         btnChat.setOnClickListener { openChat() }
         btnSettings.setOnClickListener { openSettings() }
+        btnTermux.setOnClickListener { setupTermux() }
+        btnAllFiles.setOnClickListener { browseAllFiles() }
     }
 
     private fun checkPermissions() {
@@ -116,12 +148,53 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkAllFilesPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                AlertDialog.Builder(this)
+                    .setTitle("All Files Access Required")
+                    .setMessage("Hermes Analyzer needs access to all files for binary analysis.\n\nPlease enable 'All files access' in settings.")
+                    .setPositiveButton("Open Settings") { _, _ ->
+                        val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                        startActivity(intent)
+                    }
+                    .setNegativeButton("Later", null)
+                    .show()
+            }
+        }
+    }
+
     private fun pickFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
         }
         startActivityForResult(intent, REQ_PICK_FILE)
+    }
+
+    private fun browseAllFiles() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+            Toast.makeText(this, "Please grant 'All files access' first", Toast.LENGTH_LONG).show()
+            checkAllFilesPermission()
+            return
+        }
+        startActivity(Intent(this, FileBrowserActivity::class.java))
+    }
+
+    private fun setupTermux() {
+        AlertDialog.Builder(this)
+            .setTitle("IDA Pro Mobile Setup")
+            .setMessage("Install Termux + Debian + IDA MCP Server?")
+            .setPositiveButton("Install") { _, _ ->
+                if (!TermuxInstaller.isTermuxInstalled(this)) {
+                    TermuxInstaller.installTermux(this)
+                } else {
+                    TermuxInstaller.setupIdaProInTermux(this)
+                    Toast.makeText(this, "IDA Pro MCP Server setup started in Termux", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -141,16 +214,22 @@ class MainActivity : AppCompatActivity() {
             }
             selectedFile = cacheFile
             selectedFileType = fileType
-            val hash = analyzer.computeHash(cacheFile.absolutePath)
+            val hash = fileManager.computeStreamingHash(uri)
             val size = cacheFile.length()
-            tvFileInfo.text = """Name: $name
-Type: ${fileType.uppercase()}
-Size: ${formatSize(size)}
-SHA256: ${hash.take(16)}..."""
+            tvFileInfo.text = "Name: $name\nType: ${fileType.uppercase()}\nSize: ${formatSize(size)}\nSHA256: ${hash.take(16)}..."
             appendLog("File loaded: $name ($fileType)")
+
+            // Native C++ 분석
+            val nativeInfo = nativeBridge.getBinaryInfoNative(cacheFile.absolutePath)
+            appendLog("Native: $nativeInfo")
+
+            val fileId = db.insertFile(FileInfo(
+                name = name, originalName = name, size = size,
+                fileType = fileType, filePath = cacheFile.absolutePath, hash = hash
+            ))
+            appendLog("DB id=$fileId")
         } catch (e: Exception) {
             appendLog("Error: ${e.message}")
-            Toast.makeText(this, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -167,22 +246,44 @@ SHA256: ${hash.take(16)}..."""
 
     private fun connectIda() {
         val prefs = getSharedPreferences("hermes_settings", MODE_PRIVATE)
-        val host = prefs.getString("ida_host", "192.168.1.100") ?: "192.168.1.100"
+        val host = prefs.getString("ida_host", "127.0.0.1") ?: "127.0.0.1"
         val port = prefs.getInt("ida_port", 8080)
+
         AlertDialog.Builder(this)
             .setTitle("Connect to IDA Pro MCP")
-            .setMessage("Connect to $host:$port?")
-            .setPositiveButton("Connect") { _, _ ->
-                lifecycleScope.launch(Dispatchers.IO) {
-                    val ok = idaClient.connect(host, port)
-                    runOnUiThread {
-                        tvStatus.text = if (ok) "IDA Connected!" else "IDA Connection Failed"
-                        Toast.makeText(this@MainActivity, if (ok) "Connected!" else "Failed", Toast.LENGTH_SHORT).show()
-                    }
+            .setMessage("Host: $host\nPort: $port\n\nConnect to internal (Termux) or external?")
+            .setPositiveButton("Internal (Termux)") { _, _ ->
+                connectToInternalMcp()
+            }
+            .setNegativeButton("External (PC)") { _, _ ->
+                connectToExternalMcp(host, port)
+            }
+            .setNeutralButton("Cancel", null)
+            .show()
+    }
+
+    private fun connectToInternalMcp() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val ok = idaClient.connect("127.0.0.1", 8080)
+            runOnUiThread {
+                if (ok) {
+                    tvStatus.text = "IDA Internal MCP Connected!"
+                    Toast.makeText(this@MainActivity, "Connected to Termux IDA MCP", Toast.LENGTH_SHORT).show()
+                } else {
+                    tvStatus.text = "Internal MCP Failed - Setup Termux first"
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+    }
+
+    private fun connectToExternalMcp(host: String, port: Int) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val ok = idaClient.connect(host, port)
+            runOnUiThread {
+                tvStatus.text = if (ok) "IDA External MCP Connected!" else "External IDA Failed"
+                Toast.makeText(this@MainActivity, if (ok) "Connected!" else "Failed", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun startAnalysis() {
@@ -194,20 +295,37 @@ SHA256: ${hash.take(16)}..."""
         tvStatus.text = "Analysis starting..."
         progressBar.progress = 0
         tvLog.text = ""
+
         lifecycleScope.launch(Dispatchers.IO) {
             try {
+                // 강화학습 개선 프롬프트
+                val originalFeatures = analyzer.extractFeatures(file.absolutePath, selectedFileType)
+                val improvedPrompt = rl.generateImprovedPrompt(
+                    buildAnalysisPrompt(originalFeatures),
+                    ""
+                )
+
                 val results = aiEngine.analyzeFile(file.absolutePath, selectedFileType, "full", jobId)
                 for (result in results) db.insertResult(result)
                 db.updateJobStatus(jobId, "completed", 100)
+
                 val consensus = results.find { it.platformName == "consensus" }
-                val summary = try { JSONObject(consensus?.content ?: "{}").optString("summary", "Done") } catch (_: Exception) { "Done" }
+                val summary = try {
+                    JSONObject(consensus?.content ?: "{}").optString("summary", "Done")
+                } catch (_: Exception) { "Done" }
+
+                // AI 성능 순위
+                val rankings = rl.getPlatformRankings()
+
                 runOnUiThread {
-                    tvStatus.text = "Complete!"
+                    tvStatus.text = "Complete! Top AI: ${rankings.firstOrNull()?.first ?: "N/A"}"
                     progressBar.progress = 100
                     appendLog("=== $summary ===")
                     results.filter { it.platformName != "consensus" }.forEach {
                         appendLog("[${it.platformName}] ${(it.confidence * 100).toInt()}% ${it.processingTime}ms")
                     }
+                    appendLog("=== AI Rankings ===")
+                    rankings.take(3).forEach { appendLog("${it.first}: ${(it.second * 100).toInt()}%") }
                 }
             } catch (e: Exception) {
                 db.updateJobStatus(jobId, "failed", error = e.message)
@@ -217,6 +335,10 @@ SHA256: ${hash.take(16)}..."""
                 }
             }
         }
+    }
+
+    private fun buildAnalysisPrompt(features: Map<String, Any>): String {
+        return "Analyze this binary with features: $features"
     }
 
     private fun openChat() {
