@@ -143,10 +143,10 @@ class MainActivity : AppCompatActivity() {
             selectedFileType = fileType
             val hash = analyzer.computeHash(cacheFile.absolutePath)
             val size = cacheFile.length()
-            tvFileInfo.text = "Name: $name
+            tvFileInfo.text = """Name: $name
 Type: ${fileType.uppercase()}
 Size: ${formatSize(size)}
-SHA256: ${hash.take(16)}..."
+SHA256: ${hash.take(16)}..."""
             appendLog("File loaded: $name ($fileType)")
         } catch (e: Exception) {
             appendLog("Error: ${e.message}")
