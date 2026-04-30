@@ -219,7 +219,7 @@ class MainActivity : AppCompatActivity() {
             tvFileInfo.text = "Name: $name\nType: ${fileType.uppercase()}\nSize: ${formatSize(size)}\nSHA256: ${hash.take(16)}..."
             appendLog("File loaded: $name ($fileType)")
 
-            // Native C++ 분석
+            // Native C++ analysis
             val nativeInfo = nativeBridge.getBinaryInfoNative(cacheFile.absolutePath)
             appendLog("Native: $nativeInfo")
 
@@ -298,7 +298,7 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // 강화학습 개선 프롬프트
+                // RL improvement prompt
                 val originalFeatures = analyzer.extractFeatures(file.absolutePath, selectedFileType)
                 val improvedPrompt = rl.generateImprovedPrompt(
                     buildAnalysisPrompt(originalFeatures),
@@ -314,7 +314,7 @@ class MainActivity : AppCompatActivity() {
                     JSONObject(consensus?.content ?: "{}").optString("summary", "Done")
                 } catch (_: Exception) { "Done" }
 
-                // AI 성능 순위
+                // AI performance ranking
                 val rankings = rl.getPlatformRankings()
 
                 runOnUiThread {
