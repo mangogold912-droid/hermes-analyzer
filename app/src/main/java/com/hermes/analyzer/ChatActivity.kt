@@ -1,6 +1,7 @@
 package com.hermes.analyzer
 
 import android.os.Bundle
+import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -13,77 +14,93 @@ import kotlinx.coroutines.withContext
 class ChatActivity : AppCompatActivity() {
 
     private lateinit var aiEngine: AIMultiEngine
+    private lateinit var lvChat: ListView
+    private lateinit var etMessage: EditText
+    private lateinit var btnSend: Button
+    private lateinit var spinnerPlatform: Spinner
     private val messages = mutableListOf<ChatMessage>()
+    private lateinit var adapter: ArrayAdapter<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        aiEngine = AIMultiEngine(this)
-        val platforms = aiEngine.getPlatforms().filter { it.enabled }
+        val rootLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
-        // Root layout
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        aiEngine = AIMultiEngine(this)
 
         // Title
-        root.addView(TextView(this).apply {
+        val tvTitle = TextView(this).apply {
             text = "AI Chat"
             textSize = 24f
             setPadding(16, 32, 16, 16)
-        })
+        }
+        rootLayout.addView(tvTitle)
 
         // Platform spinner
-        val spinner = Spinner(this)
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, platforms.map { it.displayName }.toTypedArray())
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinner.adapter = adapter
-        root.addView(spinner)
+        val platforms = aiEngine.getPlatforms().filter { it.enabled }
+        val platformNames = platforms.map { it.displayName }.toTypedArray()
+        val platformKeys = platforms.map { it.name }
 
-        // Chat display
-        val tvChat = TextView(this).apply {
-            text = "Chat started. Ask about binary analysis!"
-            setPadding(16, 16, 16, 16)
+        spinnerPlatform = Spinner(this).apply {
+            val sa = ArrayAdapter(this@ChatActivity, android.R.layout.simple_spinner_item, platformNames)
+            sa.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            adapter = sa
         }
-        val scrollView = ScrollView(this)
-        scrollView.addView(tvChat)
-        root.addView(scrollView, LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+        rootLayout.addView(spinnerPlatform)
 
-        // Input row
-        val inputRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val etMessage = EditText(this).apply {
-            hint = "Ask AI..."
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        // Chat list
+        val chatAdapter = ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, mutableListOf())
+        adapter = chatAdapter
+        lvChat = ListView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            dividerHeight = 1
         }
-        inputRow.addView(etMessage)
+        lvChat.adapter = adapter
+        rootLayout.addView(lvChat)
 
-        val btnSend = Button(this).apply {
-            text = "Send"
-            setOnClickListener {
-                val text = etMessage.text.toString().trim()
-                if (text.isEmpty()) return@setOnClickListener
-                val platformName = platforms.getOrNull(spinner.selectedItemPosition)?.name ?: return@setOnClickListener
+        // Input area
+        val inputLayout = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        etMessage = EditText(this).apply {
+            hint = "Ask AI about the binary..."
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        btnSend = Button(this).apply { text = "Send" }
+        inputLayout.addView(etMessage)
+        inputLayout.addView(btnSend)
+        rootLayout.addView(inputLayout)
 
-                messages.add(ChatMessage(role = "user", content = text, platformName = platformName))
-                tvChat.append("\n\nYou: $text")
-                etMessage.setText("")
+        setContentView(rootLayout)
 
-                lifecycleScope.launch(Dispatchers.IO) {
-                    try {
-                        val response = aiEngine.chat(platformName, messages.toList())
+        btnSend.setOnClickListener {
+            val text = etMessage.text.toString().trim()
+            if (text.isEmpty()) return@setOnClickListener
+
+            val platformIdx = spinnerPlatform.selectedItemPosition
+            val platformName = platformKeys[platformIdx]
+
+            addMessage("You: $text")
+            messages.add(ChatMessage(role = "user", content = text, platformName = platformName))
+            etMessage.setText("")
+
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val response = aiEngine.chat(platformName, messages.toList())
+                    withContext(Dispatchers.Main) {
                         messages.add(ChatMessage(role = "assistant", content = response, platformName = platformName))
-                        withContext(Dispatchers.Main) {
-                            tvChat.append("\n\n${platformName}: $response")
-                        }
-                    } catch (e: Exception) {
-                        withContext(Dispatchers.Main) {
-                            tvChat.append("\n\nError: ${e.message}")
-                        }
+                        addMessage("${platforms[platformIdx].displayName}: $response")
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        addMessage("Error: ${e.message}")
                     }
                 }
             }
         }
-        inputRow.addView(btnSend)
-        root.addView(inputRow)
+    }
 
-        setContentView(root)
+    private fun addMessage(text: String) {
+        adapter.add(text)
+        adapter.notifyDataSetChanged()
+        lvChat.setSelection(adapter.count - 1)
     }
 }

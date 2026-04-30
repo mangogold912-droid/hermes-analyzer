@@ -120,8 +120,8 @@ class BinaryAnalyzer {
         fis.read(header)
         fis.close()
 
-        val isElf = header[0] == 0x7F.toByte() && header[1] == 'E'.code.toByte() &&
-                header[2] == 'L'.code.toByte() && header[3] == 'F'.code.toByte()
+        val isElf = header[0] == 0x7F.toByte() && header[1] == 0x45.toByte() &&
+                header[2] == 0x4C.toByte() && header[3] == 0x46.toByte()
         result["isElf"] = isElf.toString()
 
         if (isElf) {
@@ -164,8 +164,8 @@ class BinaryAnalyzer {
         val header = ByteArray(64)
         fis.read(header)
 
-        val isElf = header[0] == 0x7F.toByte() && header[1] == 'E'.code.toByte() &&
-                header[2] == 'L'.code.toByte() && header[3] == 'F'.code.toByte()
+        val isElf = header[0] == 0x7F.toByte() && header[1] == 0x45.toByte() &&
+                header[2] == 0x4C.toByte() && header[3] == 0x46.toByte()
         if (!isElf) return ElfHeader()
 
         val bits = header[4].toInt()
