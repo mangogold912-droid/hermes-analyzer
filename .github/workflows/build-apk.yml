@@ -45,9 +45,18 @@ jobs:
           ${{ runner.os }}-gradle-
 
     - name: Build Debug APK
-      run: gradle assembleDebug --stacktrace
+      run: gradle assembleDebug --stacktrace 2>&1 | tee build.log
+
+    - name: Upload Build Log (always)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
+        retention-days: 5
 
     - name: Upload Debug APK
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: HermesAnalyzer-Debug
@@ -55,6 +64,7 @@ jobs:
         retention-days: 30
 
     - name: Show APK info
+      if: success()
       run: |
         echo "========================================"
         echo "  APK Build Complete!"
@@ -72,20 +82,13 @@ jobs:
           ## Hermes Analyzer - Full Featured Build
 
           ### Features
+          - 50 Reverse Engineering Plugins (RE Discord Community Tools)
           - C++ Native Disassembler (Capstone) - ARM64/ARM/x86/x64
-          - IDA Pro MCP Server Integration (External + Internal via Termux)
-          - 8 AI Platforms Parallel Analysis (OpenAI, Kimi, Qwen, Gemini, Claude, DeepSeek, Ollama, Suprninja)
-          - AI Chat Interface
-          - Reinforcement Learning (Feedback-based AI improvement)
-          - Unlimited File Size Processing
+          - IDA Pro MCP Server Integration
+          - 8 AI Platforms Parallel Analysis
+          - AI Chat with Memory & Auto-Plugin Execution
+          - Built-in Terminal (xterm.js)
           - MANAGE_EXTERNAL_STORAGE (All files access)
-          - Termux Auto-Setup for IDA Pro Linux
           - Binary Analysis (ELF, DEX, APK, SO)
-
-          ### How to Install
-          1. Download APK below
-          2. Enable "Install from Unknown Sources"
-          3. Grant "All files access" permission on first launch
-          4. Optional: Tap "IDA Mobile" to setup Termux + Debian + IDA MCP
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
