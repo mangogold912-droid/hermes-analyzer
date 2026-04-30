@@ -14,91 +14,48 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout source code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+    - uses: actions/checkout@v4
 
-    - name: Setup JDK 17
-      uses: actions/setup-java@v4
+    - uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+    - uses: android-actions/setup-android@v3
       with:
         cmdline-tools-version: '12266719'
         packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+    - run: chmod +x gradlew
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+    - run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
 
-    - name: Debug - List all outputs
+    - run: find . -name "*.apk" -type f
+
+    - run: ls -laR app/build/outputs/ 2>/dev/null || echo "No outputs"
       if: always()
-      run: |
-        echo "=== APK Search ==="
-        find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
-        echo ""
-        echo "=== Build outputs tree ==="
-        ls -laR app/build/outputs/ 2>/dev/null || echo "No outputs dir"
-        echo ""
-        echo "=== Build directory ==="
-        ls -la app/build/ 2>/dev/null || echo "No build dir"
 
-    - name: Upload Build Log
+    - uses: actions/upload-artifact@v4
       if: always()
-      uses: actions/upload-artifact@v4
       with:
         name: build-log
         path: build.log
-        retention-days: 5
 
-    - name: Upload APK if found
-      if: success()
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: HermesAnalyzer-Debug
         path: app/build/**/*.apk
         if-no-files-found: warn
-        retention-days: 30
 
-    - name: Create Release with APK
-      if: github.ref == 'refs/heads/main' && success()
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
       run: |
         APK=$(find app/build -name "*.apk" | head -1)
         if [ -n "$APK" ]; then
-          echo "Found APK: $APK"
-          gh release create "v${{ github.run_number }}" "$APK"             --title "Hermes Analyzer v${{ github.run_number }}"             --notes "## Hermes Analyzer v${{ github.run_number }}
-
-### Features
-- 50 RE Plugins
-- C++ Native Disassembler
-- IDA Pro MCP Server
-- 8 AI Platforms
-- AI Chat with Memory
-- Built-in Terminal
-- All files access"
+          gh release create "v${GITHUB_RUN_NUMBER}" "$APK" --repo "$GITHUB_REPOSITORY" --title "Hermes Analyzer v${GITHUB_RUN_NUMBER}" --notes "Build ${GITHUB_RUN_NUMBER}"
         else
-          echo "No APK found, creating release without file"
-          gh release create "v${{ github.run_number }}"             --title "Hermes Analyzer v${{ github.run_number }}"             --notes "## Hermes Analyzer v${{ github.run_number }}
-
-### Build Status
-APK build may have issues. Check build logs.
-
-### Features
-- 50 RE Plugins
-- C++ Native Disassembler
-- IDA Pro MCP Server
-- 8 AI Platforms
-- AI Chat with Memory
-- Built-in Terminal
-- All files access"
+          echo "No APK found for release"
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
