@@ -1,8 +1,13 @@
-import androidx.appcompat.app.AlertDialog
 package com.hermes.analyzer
 
+import android.content.SharedPreferences
 import android.os.Bundle
-import android.widget.*
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.Switch
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.hermes.analyzer.ai.AIMultiEngine
@@ -11,57 +16,49 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_settings)
+        val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        setContentView(container)
 
         val aiEngine = AIMultiEngine(this)
-        val prefs = getSharedPreferences("hermes_settings", MODE_PRIVATE)
-        val container = findViewById<LinearLayout>(R.id.containerSettings)
+        val prefs: SharedPreferences = getSharedPreferences("hermes_settings", MODE_PRIVATE)
 
-        // Title
-        val tvTitle = TextView(this).apply {
+        container.addView(TextView(this).apply {
             text = "AI Platform API Keys"
             textSize = 20f
-            setPadding(0, 16, 0, 16)
-        }
-        container.addView(tvTitle)
+            setPadding(16, 32, 16, 16)
+        })
 
-        // API Key inputs for each platform
         aiEngine.getPlatforms().forEach { platform ->
-            val tvLabel = TextView(this).apply {
+            container.addView(TextView(this).apply {
                 text = platform.displayName
-                textSize = 16f
-                setPadding(0, 16, 0, 8)
-            }
-            container.addView(tvLabel)
+                setPadding(16, 16, 16, 8)
+            })
 
             val etKey = EditText(this).apply {
                 hint = "Enter API Key"
                 setText(prefs.getString("key_${platform.name}", "") ?: "")
-                setOnFocusChangeListener { _, hasFocus ->
-                    if (!hasFocus) {
-                        prefs.edit().putString("key_${platform.name}", text.toString()).apply()
-                    }
-                }
             }
             container.addView(etKey)
 
-            val switch = Switch(this).apply {
+            container.addView(Switch(this).apply {
                 text = "Enabled"
                 isChecked = platform.enabled
                 setOnCheckedChangeListener { _, checked ->
                     aiEngine.setEnabled(platform.name, checked)
+                    prefs.edit().putBoolean("enabled_${platform.name}", checked).apply()
                 }
+            })
+
+            etKey.setOnFocusChangeListener { _, hasFocus ->
+                if (!hasFocus) prefs.edit().putString("key_${platform.name}", etKey.text.toString()).apply()
             }
-            container.addView(switch)
         }
 
-        // IDA Pro Settings
-        val tvIda = TextView(this).apply {
+        container.addView(TextView(this).apply {
             text = "IDA Pro MCP Server"
             textSize = 20f
-            setPadding(0, 32, 0, 16)
-        }
-        container.addView(tvIda)
+            setPadding(16, 32, 16, 16)
+        })
 
         val etIdaHost = EditText(this).apply {
             hint = "Host (default: 192.168.1.100)"
@@ -75,8 +72,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         container.addView(etIdaPort)
 
-        // Save button
-        val btnSave = Button(this).apply {
+        container.addView(Button(this).apply {
             text = "Save Settings"
             setOnClickListener {
                 prefs.edit().apply {
@@ -84,13 +80,11 @@ class SettingsActivity : AppCompatActivity() {
                     putInt("ida_port", etIdaPort.text.toString().toIntOrNull() ?: 8080)
                     apply()
                 }
-                Toast.makeText(this@SettingsActivity, "Settings saved!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@SettingsActivity, "Saved!", Toast.LENGTH_SHORT).show()
             }
-        }
-        container.addView(btnSave)
+        })
 
-        // Clear data button
-        val btnClear = Button(this).apply {
+        container.addView(Button(this).apply {
             text = "Clear All Data"
             setOnClickListener {
                 AlertDialog.Builder(this@SettingsActivity)
@@ -99,12 +93,11 @@ class SettingsActivity : AppCompatActivity() {
                     .setPositiveButton("Yes") { _, _ ->
                         val db = com.hermes.analyzer.db.AnalysisDatabase(this@SettingsActivity)
                         db.clearAll()
-                        Toast.makeText(this@SettingsActivity, "All data cleared!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@SettingsActivity, "Cleared!", Toast.LENGTH_SHORT).show()
                     }
                     .setNegativeButton("No", null)
                     .show()
             }
-        }
-        container.addView(btnClear)
+        })
     }
 }
