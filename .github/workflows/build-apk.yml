@@ -39,14 +39,6 @@ jobs:
     - name: Build Debug APK with wrapper
       run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
 
-    - name: Find APK path
-      id: apk
-      run: |
-        APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
-        echo "APK path: $APK_PATH"
-        echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-        echo "APK size: $(ls -lh $APK_PATH | awk '{print $5}')"
-
     - name: Upload Build Log
       if: always()
       uses: actions/upload-artifact@v4
@@ -60,7 +52,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: HermesAnalyzer-Debug
-        path: ${{ steps.apk.outputs.apk_path }}
+        path: app/build/outputs/apk/debug/
         retention-days: 30
 
     - name: Show APK info
@@ -69,13 +61,13 @@ jobs:
         echo "========================================"
         echo "  APK Build Complete!"
         echo "========================================"
-        ls -lh ${{ steps.apk.outputs.apk_path }}
+        ls -lh app/build/outputs/apk/debug/
 
     - name: Create Release
       if: github.ref == 'refs/heads/main' && success()
       uses: softprops/action-gh-release@v2
       with:
-        files: ${{ steps.apk.outputs.apk_path }}
+        files: app/build/outputs/apk/debug/*.apk
         tag_name: v${{ github.run_number }}
         name: Hermes Analyzer v${{ github.run_number }}
         body: |
