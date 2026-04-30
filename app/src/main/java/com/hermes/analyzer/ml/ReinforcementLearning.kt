@@ -8,7 +8,7 @@ import org.json.JSONObject
 class ReinforcementLearning(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("hermes_rl", Context.MODE_PRIVATE)
 
-    // 분석 결과에 대한 피드백을 저장하고 AI 성능 개선
+    // Store feedback on analysis results for AI improvement
     data class Feedback(
         val platformName: String,
         val resultType: String,
@@ -47,7 +47,7 @@ class ReinforcementLearning(context: Context) {
         return feedbacks.sortedByDescending { it.userRating }
     }
 
-    // AI 성능 점수 계산
+    // Calculate AI performance score
     fun calculatePlatformScore(platformName: String): Float {
         val platformFeedbacks = getAllFeedback().filter { it.platformName == platformName }
         if (platformFeedbacks.isEmpty()) return 0.5f
@@ -58,26 +58,26 @@ class ReinforcementLearning(context: Context) {
         return (avgRating / 5f * 0.6f + accuracy * 0.4f).coerceIn(0f, 1f)
     }
 
-    // 최고 성능 AI 순위
+    // Top performing AI ranking
     fun getPlatformRankings(): List<Pair<String, Float>> {
         val platforms = listOf("openai", "kimi", "qwen", "gemini", "claude", "deepseek", "ollama", "suprninja")
         return platforms.map { it to calculatePlatformScore(it) }.sortedByDescending { it.second }
     }
 
-    // 프롬프트 개선 제안
+    // Prompt improvement suggestions
     fun generateImprovedPrompt(originalPrompt: String, analysisResult: String): String {
         val topPlatform = getPlatformRankings().firstOrNull()?.first ?: "openai"
         return """
             $originalPrompt
 
-            [이전 분석 결과]
+            [Previous analysis results]
             $analysisResult
 
-            [강화학습 피드백 반영]
-            - 최고 성능 플랫폼: $topPlatform
-            - 더 정확하고 상세한 분석을 제공하세요
-            - 코드의 의도와 실제 동작을 추론하세요
-            - 보안 취약점을 구체적으로 지적하세요
+            [RL feedback applied]
+            - Top platform: $topPlatform
+            - Provide more accurate and detailed analysis
+            - Infer code intent vs actual behavior
+            - Point out specific security vulnerabilities
         """.trimIndent()
     }
 }
