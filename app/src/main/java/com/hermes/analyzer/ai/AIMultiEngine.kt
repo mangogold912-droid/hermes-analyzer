@@ -516,7 +516,7 @@ class AIMultiEngine(context: Context) {
     }
 
     private fun computeConsensus(results: List<AIResult>, jobId: Long, jobType: String): AIResult {
-        if (results.isEmpty()) return AIResult(jobId, "consensus", jobType, "No results", confidence = 0f)
+        if (results.isEmpty()) return AIResult(jobId=jobId, platformName="consensus", resultType=jobType, content="No results", confidence=0f)
 
         val valid = results.filter { it.confidence > 0.2f }
         val avgConfidence = if (valid.isNotEmpty()) valid.map { it.confidence }.average().toFloat() else 0f

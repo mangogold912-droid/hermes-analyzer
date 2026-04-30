@@ -291,7 +291,7 @@ class BinaryAnalyzer {
             val shHeaders = mutableListOf<ByteArray>()
             for (i in 0 until shNum) {
                 val sh = ByteArray(shEntSize)
-                shChannelPosition(shOff + i * shEntSize)
+                fis.channel.position(shOff + i * shEntSize)
                 fis.read(sh)
                 shHeaders.add(sh)
             }
@@ -319,14 +319,14 @@ class BinaryAnalyzer {
             val strTabSize = read32le(shHeaders[strTabIdx], 20).toLong()
 
             val strTab = ByteArray(strTabSize.toInt())
-            shChannelPosition(strTabOff2)
+            fis.channel.position(strTabOff2)
             fis.read(strTab)
 
             val symbols = mutableListOf<String>()
             for (i in 1 until symCount) {
                 val symOff = symTabOff + i * symEntSize
                 val sym = ByteArray(symEntSize)
-                shChannelPosition(symOff)
+                fis.channel.position(symOff)
                 fis.read(sym)
                 val nameOff = read32le(sym, 0)
                 if (nameOff in 0 until strTab.size) {
