@@ -36,8 +36,20 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Debug APK with wrapper
+    - name: Build Debug APK
       run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+
+    - name: Debug - List all outputs
+      if: always()
+      run: |
+        echo "=== APK Search ==="
+        find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
+        echo ""
+        echo "=== Build outputs tree ==="
+        ls -laR app/build/outputs/ 2>/dev/null || echo "No outputs dir"
+        echo ""
+        echo "=== Build directory ==="
+        ls -la app/build/ 2>/dev/null || echo "No build dir"
 
     - name: Upload Build Log
       if: always()
@@ -47,39 +59,46 @@ jobs:
         path: build.log
         retention-days: 5
 
-    - name: Upload Debug APK artifact
+    - name: Upload APK if found
       if: success()
       uses: actions/upload-artifact@v4
       with:
         name: HermesAnalyzer-Debug
-        path: app/build/outputs/apk/debug/
+        path: app/build/**/*.apk
+        if-no-files-found: warn
         retention-days: 30
 
-    - name: Show APK info
-      if: success()
-      run: |
-        echo "========================================"
-        echo "  APK Build Complete!"
-        echo "========================================"
-        ls -lh app/build/outputs/apk/debug/
-
-    - name: Create Release
+    - name: Create Release with APK
       if: github.ref == 'refs/heads/main' && success()
-      uses: softprops/action-gh-release@v2
-      with:
-        files: app/build/outputs/apk/debug/*.apk
-        tag_name: v${{ github.run_number }}
-        name: Hermes Analyzer v${{ github.run_number }}
-        body: |
-          ## Hermes Analyzer v${{ github.run_number }}
+      run: |
+        APK=$(find app/build -name "*.apk" | head -1)
+        if [ -n "$APK" ]; then
+          echo "Found APK: $APK"
+          gh release create "v${{ github.run_number }}" "$APK"             --title "Hermes Analyzer v${{ github.run_number }}"             --notes "## Hermes Analyzer v${{ github.run_number }}
 
-          ### Features
-          - 50 Reverse Engineering Plugins (RE Discord Community Tools)
-          - C++ Native Disassembler (Capstone)
-          - IDA Pro MCP Server Integration
-          - 8 AI Platforms Parallel Analysis
-          - AI Chat with Memory & Auto-Plugin Execution
-          - Built-in Terminal (xterm.js)
-          - MANAGE_EXTERNAL_STORAGE (All files access)
+### Features
+- 50 RE Plugins
+- C++ Native Disassembler
+- IDA Pro MCP Server
+- 8 AI Platforms
+- AI Chat with Memory
+- Built-in Terminal
+- All files access"
+        else
+          echo "No APK found, creating release without file"
+          gh release create "v${{ github.run_number }}"             --title "Hermes Analyzer v${{ github.run_number }}"             --notes "## Hermes Analyzer v${{ github.run_number }}
+
+### Build Status
+APK build may have issues. Check build logs.
+
+### Features
+- 50 RE Plugins
+- C++ Native Disassembler
+- IDA Pro MCP Server
+- 8 AI Platforms
+- AI Chat with Memory
+- Built-in Terminal
+- All files access"
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
