@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout source code
       uses: actions/checkout@v4
@@ -60,7 +60,6 @@ jobs:
         echo "  APK Build Complete!"
         echo "========================================"
         ls -lh app/build/outputs/apk/debug/*.apk || echo "No APK found"
-        du -h app/build/outputs/apk/debug/app-debug.apk 2>/dev/null || true
 
     - name: Create Release
       if: github.ref == 'refs/heads/main' && success()
@@ -70,10 +69,23 @@ jobs:
         tag_name: v${{ github.run_number }}
         name: Hermes Analyzer v${{ github.run_number }}
         body: |
-          ## Hermes Analyzer - Automated Build
-          - IDA Pro MCP Server Integration
-          - 8 AI Platforms Parallel Analysis
+          ## Hermes Analyzer - Full Featured Build
+
+          ### Features
+          - C++ Native Disassembler (Capstone) - ARM64/ARM/x86/x64
+          - IDA Pro MCP Server Integration (External + Internal via Termux)
+          - 8 AI Platforms Parallel Analysis (OpenAI, Kimi, Qwen, Gemini, Claude, DeepSeek, Ollama, Suprninja)
           - AI Chat Interface
+          - Reinforcement Learning (Feedback-based AI improvement)
+          - Unlimited File Size Processing
+          - MANAGE_EXTERNAL_STORAGE (All files access)
+          - Termux Auto-Setup for IDA Pro Linux
           - Binary Analysis (ELF, DEX, APK, SO)
+
+          ### How to Install
+          1. Download APK below
+          2. Enable "Install from Unknown Sources"
+          3. Grant "All files access" permission on first launch
+          4. Optional: Tap "IDA Mobile" to setup Termux + Debian + IDA MCP
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
