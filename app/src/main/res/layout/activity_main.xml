@@ -19,7 +19,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="IDA Pro MCP + 8 AI Binary Analysis"
+        android:text="IDA Pro Mobile + 8 AI + Native Engine + RL"
         android:textSize="12sp"
         android:textColor="#64748b"
         android:gravity="center"
@@ -57,12 +57,34 @@
             android:backgroundTint="#0ea5e9" />
 
         <Button
+            android:id="@+id/btnAllFiles"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="All Files"
+            android:backgroundTint="#8b5cf6" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
             android:id="@+id/btnConnectIda"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Connect IDA"
             android:backgroundTint="#8b5cf6" />
+
+        <Button
+            android:id="@+id/btnTermux"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="IDA Mobile"
+            android:backgroundTint="#ec4899" />
     </LinearLayout>
 
     <LinearLayout
