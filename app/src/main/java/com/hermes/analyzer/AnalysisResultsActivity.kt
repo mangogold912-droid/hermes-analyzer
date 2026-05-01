@@ -26,7 +26,7 @@ class AnalysisResultsActivity : AppCompatActivity() {
             sb.append("No results found for job $jobId")
         } else {
             results.forEach { result ->
-                sb.appendLine("=== ${result.platformName.uppercase()} ===")
+                sb.appendLine("=== ${result.platformName.toUpperCase()} ===")
                 try {
                     val json = JSONObject(result.content)
                     sb.appendLine("Summary: ${json.optString("summary", "N/A")}")
