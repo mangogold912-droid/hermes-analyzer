@@ -52,6 +52,10 @@
         <activity android:name=".TerminalActivity" />
         <activity android:name=".BrowserActivity" />
 
+        <activity android:name=".FileManagerActivity" />
+        <activity android:name=".GitHubIntegrationActivity" />
+        <activity android:name=".IDAMobileActivity" />
+        <activity android:name=".EnhancedBrowserActivity" />
         <!-- Termux 연동 서비스 -->
         <service android:name=".termux.TermuxAutomationService"
             android:foregroundServiceType="dataSync"
