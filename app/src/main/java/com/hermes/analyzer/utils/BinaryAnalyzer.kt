@@ -143,7 +143,7 @@ object BinaryAnalyzer {
 
         for ((index, b) in bytes.withIndex()) {
             if (b.toInt() in 0x20..0x7E) {
-                if (currentString.isEmpty()) {
+                if (currentString.length == 0) {
                     startOffset = index.toLong()
                 }
                 currentString.append(b.toInt().toChar())
@@ -176,7 +176,7 @@ object BinaryAnalyzer {
 
         for ((index, b) in bytes.withIndex()) {
             if (b.toInt() in 0x20..0x7E) {
-                if (currentString.isEmpty()) {
+                if (currentString.length == 0) {
                     startOffset = index.toLong()
                 }
                 currentString.append(b.toInt().toChar())
@@ -854,4 +854,44 @@ object BinaryAnalyzer {
         val manifestPattern = "AndroidManifest.xml".toByteArray(StandardCharsets.US_ASCII)
         return containsPattern(bytes, manifestPattern)
     }
-}
+    /**
+     * Extract features from file for AI analysis
+     */
+    fun extractFeatures(filePath: String, fileType: String): Map<String, Any> {
+        val file = File(filePath)
+        val bytes = readBytes(file) ?: return mapOf("error" to "Cannot read file")
+        val features = mutableMapOf<String, Any>()
+
+        features["fileSize"] = file.length()
+        features["fileType"] = fileType
+        features["entropy"] = calculateEntropy(bytes)
+        features["md5"] = computeHash(bytes, "MD5")
+        features["sha256"] = computeHash(bytes, "SHA-256")
+        features["strings"] = extractStrings(bytes).take(100)
+        features["hexPreview"] = toHexString(bytes, 128)
+
+        when (detectFileType(bytes)) {
+            FileType.ELF -> {
+                features["architecture"] = analyzeElfArchitecture(bytes)
+                features["type"] = "ELF Binary"
+            }
+            FileType.DEX -> {
+                features["type"] = "DEX File"
+                features["stringCount"] = parseDexStringTable(bytes).size
+            }
+            FileType.APK -> {
+                features["type"] = "APK Archive"
+                features["isApk"] = true
+            }
+            else -> features["type"] = "Unknown"
+        }
+
+        return features
+    }
+
+    private fun computeHash(bytes: ByteArray, algorithm: String): String {
+        val md = java.security.MessageDigest.getInstance(algorithm)
+        md.update(bytes)
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
