@@ -26,7 +26,6 @@ jobs:
         packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
     - run: chmod +x gradlew
     - run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
-    - run: find app/build -name "*.apk"
     - uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -37,27 +36,3 @@ jobs:
         name: HermesAnalyzer-Debug
         path: app/build/outputs/apk/debug/
         if-no-files-found: warn
-    - name: Create Release with curl
-      if: github.ref == 'refs/heads/main'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        APK=$(find app/build -name "*.apk" | head -1)
-        echo "APK: $APK"
-        ls -lh "$APK"
-
-        TAG="v${GITHUB_RUN_NUMBER}"
-        echo "Tag: $TAG"
-
-        # Create release
-        RELEASE_JSON=$(curl -s -X POST           -H "Authorization: token $GITHUB_TOKEN"           -H "Content-Type: application/json"           -d "{"tag_name":"$TAG","name":"Hermes Analyzer $TAG","body":"Build $TAG"}"           "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases")
-
-        RELEASE_ID=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
-        UPLOAD_URL=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")
-
-        echo "Release ID: $RELEASE_ID"
-        echo "Upload URL: $UPLOAD_URL"
-
-        # Upload APK
-        APK_NAME=$(basename "$APK")
-        curl -v -X POST           -H "Authorization: token $GITHUB_TOKEN"           -H "Content-Type: application/vnd.android.package-archive"           --data-binary "@$APK"           "${UPLOAD_URL}?name=${APK_NAME}"
