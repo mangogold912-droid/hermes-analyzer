@@ -319,43 +319,5 @@ $body")
         Log.d(TAG, msg)
         onLog?.invoke(msg)
     }
-/**
-     * Auto-start embedded MCP server if not running
-     */
-    fun startEmbeddedServerIfNeeded(): Boolean {
-        return try {
-            val socket = java.net.Socket()
-            socket.connect(java.net.InetSocketAddress("127.0.0.1", 8080), 500)
-            socket.close()
-            true // Already running
-        } catch (e: Exception) {
-            // Start embedded server in background thread
-            Thread {
-                try {
-                    val server = java.net.ServerSocket(8080)
-                    while (!server.isClosed) {
-                        val client = server.accept()
-                        Thread {
-                            try {
-                                val reader = client.getInputStream().bufferedReader()
-                                val writer = client.getOutputStream().bufferedWriter()
-                                val request = reader.readLine() ?: ""
-                                if (request.contains("/status")) {
-                                    writer.write("HTTP/1.1 200 OK\r\nContent-Length: 24\r\n\r\n{\"status\":\"ready\"}")
-                                } else if (request.contains("/mcp")) {
-                                    writer.write("HTTP/1.1 200 OK\r\nContent-Length: 40\r\n\r\n{\"functions\":[],\"strings\":[],\"segments\":[]}")
-                                } else {
-                                    writer.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
-                                }
-}
-                                writer.flush()
-                            } catch (_: Exception) {}
-                            finally { client.close() }
-                        }.start()
-                    }
-                } catch (_: Exception) {}
-            }.apply { isDaemon = true; start() }
-            Thread.sleep(300)
-            true
-        }
     }
+}
