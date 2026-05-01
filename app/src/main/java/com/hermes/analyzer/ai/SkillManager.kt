@@ -221,8 +221,8 @@ md5sum "\${'$'}{input}" && sha256sum "\${'$'}{input}""""
 if [ -f "\${'$'}{input}" ]; then base64 "\${'$'}{input}"; else echo "\${'$'}{input}" | base64; fi"""
 
     private fun generatePortScanSkill(): String = """#!/system/bin/sh
-for port in 22 80 443 8080 3000; do
-  timeout 1 bash -c "echo >/dev/tcp/\${'$'}{input}/\$port" 2>/dev/null && echo "Port \$port: OPEN" || echo "Port \$port: CLOSED"
+for p in 22 80 443 8080 3000; do
+  timeout 1 bash -c "echo >/dev/tcp/\${input}/\${'\$'}p" 2>/dev/null && echo "Port \${'\$'}p: OPEN" || echo "Port \${'\$'}p: CLOSED"
 done"""
 
     private fun generateGenericSkill(description: String): String = """#!/system/bin/sh
