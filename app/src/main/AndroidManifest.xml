@@ -38,6 +38,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ChatGPTActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Hermes"
+            android:windowSoftInputMode="adjustResize" />
+
         <activity android:name=".AnalysisResultsActivity" />
         <activity android:name=".ChatActivity" />
         <activity android:name=".SettingsActivity" />
