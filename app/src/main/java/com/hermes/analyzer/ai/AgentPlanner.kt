@@ -274,19 +274,8 @@ class AgentPlanner {
             ))
         }
         
-        // === Step 6: 결과 종합 (마지막) ===
-        val allPrevSteps = plan.map { it.step }
-        if (allPrevSteps.isNotEmpty()) {
-            plan.add(PlanStep(
-                step = stepNum,
-                description = "Synthesize final report",
-                toolIds = listOf("ai_synthesis"),
-                parallel = false,
-                dependsOn = allPrevSteps,
-                rationale = "Combine all analysis results into a comprehensive report"
-            ))
-        }
-        
+        // Note: Final AI synthesis is handled by AdvancedAIEngine.chatWithParallelAI()
+        // after plugin results are collected. No separate plugin step needed.
         return plan
     }
 
@@ -337,3 +326,4 @@ class AgentPlanner {
         return keywords.any { text.contains(it.lowercase()) }
     }
 }
+
