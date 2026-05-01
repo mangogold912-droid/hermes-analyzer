@@ -271,7 +271,7 @@ class AdvancedAIEngine(private val context: Context) {
                 chatWithParallelAI(analysisPrompt, filePath)
             } catch (e: Exception) {
                 // API errors are blocked - return local analysis only
-                generateRuleBasedFallback(userGoal, filePath)
+                localLLM.generateResponse(analysisPrompt)
             }
         }
         sb.append(aiResult)
@@ -1234,7 +1234,7 @@ class AdvancedAIEngine(private val context: Context) {
      * Users NEVER see raw API errors.
      */
         private fun generateLocalFallbackResponse(userMessage: String, filePath: String?): String {
-        val prompt = buildLocalLLMPrompt(userMessage, filePath)
+        val prompt = if (filePath != null) "Analyze file $filePath: $userMessage" else userMessage
         return try {
             localLLM.generateResponse(prompt)
         } catch (e: Exception) {
