@@ -4,10 +4,6 @@ import android.webkit.JavascriptInterface
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * BrowserEngine
- * 내장 브라우저 HTML 파싱 엔진 (본문, 링크, 표, 코드 블록 추출)
- */
 class BrowserEngine {
 
     data class ParsedPage(
@@ -35,12 +31,6 @@ class BrowserEngine {
             put("links", JSONArray(result.links.map { JSONObject().apply {
                 put("text", it.text); put("href", it.href)
             }}))
-            put("tables", JSONArray(result.tables.map { t ->
-                JSONObject().apply {
-                    put("headers", JSONArray(t.headers))
-                    put("rows", JSONArray(t.rows.map { JSONArray(it) }))
-                }
-            }))
             put("codeBlocks", JSONArray(result.codeBlocks.map { JSONObject().apply {
                 put("language", it.language); put("code", it.code.take(500))
             }}))
@@ -48,83 +38,83 @@ class BrowserEngine {
     }
 
     fun parseHTML(html: String, url: String): ParsedPage {
-        val title = Regex("<title[^>]*>([^<]*)</title>", RegexOption.IGNORE_CASE).find(html)?.groupValues?.get(1)?.trim() ?: ""
-        
-        // Extract body text (strip tags)
+        val title = extractTitle(html)
         val bodyText = stripTags(html)
-        
-        // Extract links
-        val links = mutableListOf<LinkInfo>()
-        Regex("""<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)</a>""", RegexOption.IGNORE_CASE).findAll(html).forEach { match ->
-            links.add(LinkInfo(match.groupValues[2].trim(), resolveUrl(match.groupValues[1], url)))
-        }
-        
-        // Extract tables
+        val links = extractLinks(html, url)
         val tables = extractTables(html)
-        
-        // Extract code blocks
-        val codeBlocks = mutableListOf<CodeBlock>()
-        Regex("""<pre[^>]*>(.*?)</pre>""", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE).findAll(html).forEach { match ->
-            val content = stripTags(match.groupValues[1])
-            codeBlocks.add(CodeBlock(null, content))
-        }
-        Regex("""<code[^>]*>(.*?)</code>""", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE).findAll(html).forEach { match ->
-            val content = stripTags(match.groupValues[1])
-            if (content.length > 20) {
-                codeBlocks.add(CodeBlock(null, content))
-            }
-        }
-        
-        // Extract images
-        val images = mutableListOf<ImageInfo>()
-        Regex("""<img[^>]+src=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE).findAll(html).forEach { match ->
-            val imgTag = match.groupValues[0]
-            val src = resolveUrl(match.groupValues[1], url)
-            val alt = Regex("""alt=["']([^"']*)["']""").find(imgTag)?.groupValues?.get(1) ?: ""
-            images.add(ImageInfo(src, alt, 0, 0))
-        }
-        
+        val codeBlocks = extractCodeBlocks(html)
+        val images = extractImages(html, url)
         return ParsedPage(title, url, bodyText, links, tables, codeBlocks, images)
+    }
+
+    private fun extractTitle(html: String): String {
+        val idx = html.indexOf("<title>", ignoreCase = true)
+        val end = html.indexOf("</title>", ignoreCase = true)
+        return if (idx >= 0 && end > idx) html.substring(idx + 7, end).trim() else ""
     }
 
     private fun stripTags(html: String): String {
         var text = html
-        text = text.replace(Regex("<script[^>]*>.*?</script>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), " ")
-        text = text.replace(Regex("<style[^>]*>.*?</style>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), " ")
-        text = text.replace(Regex("<[^>]+>"), " ")
-        text = text.replace("&lt;", "<")
-        text = text.replace("&gt;", ">")
-        text = text.replace("&amp;", "&")
-        text = text.replace("&quot;", "\"")
-        text = text.replace(Regex("\s+"), " ")
-        return text.trim()
+        while (true) {
+            val start = text.indexOf('<')
+            if (start == -1) break
+            val end = text.indexOf('>', start)
+            if (end == -1) break
+            text = text.substring(0, start) + " " + text.substring(end + 1)
+        }
+        return text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&quot;", "\\"").replace("  ", " ").trim()
     }
 
+    private fun extractLinks(html: String, baseUrl: String): List<LinkInfo> {
+        val links = mutableListOf<LinkInfo>()
+        val pattern = Regex("""<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)</a>""", RegexOption.IGNORE_CASE)
+        pattern.findAll(html).forEach { match ->
+            links.add(LinkInfo(match.groupValues[2].trim(), resolveUrl(match.groupValues[1], baseUrl)))
+        }
+        return links
+    }
 
     private fun extractTables(html: String): List<TableInfo> {
         val tables = mutableListOf<TableInfo>()
-        Regex("""<table[^>]*>(.*?)</table>""", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE).findAll(html).forEach { tableMatch ->
+        val tablePattern = Regex("""<table[^>]*>(.*?)</table>""", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+        tablePattern.findAll(html).forEach { tableMatch ->
             val tableHtml = tableMatch.groupValues[1]
             val headers = mutableListOf<String>()
             val rows = mutableListOf<List<String>>()
-            
-            Regex("""<th[^>]*>(.*?)</th>""", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE).findAll(tableHtml).forEach { th ->
+            Regex("""<th[^>]*>(.*?)</th>""", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(tableHtml).forEach { th ->
                 headers.add(stripTags(th.groupValues[1]).trim())
             }
-            
-            Regex("""<tr[^>]*>(.*?)</tr>""", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE).findAll(tableHtml).forEach { tr ->
+            Regex("""<tr[^>]*>(.*?)</tr>""", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(tableHtml).forEach { tr ->
                 val cells = mutableListOf<String>()
-                Regex("""<td[^>]*>(.*?)</td>""", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE).findAll(tr.groupValues[1]).forEach { td ->
+                Regex("""<td[^>]*>(.*?)</td>""", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(tr.groupValues[1]).forEach { td ->
                     cells.add(stripTags(td.groupValues[1]).trim())
                 }
                 if (cells.isNotEmpty()) rows.add(cells)
             }
-            
-            if (headers.isNotEmpty() || rows.isNotEmpty()) {
-                tables.add(TableInfo(headers, rows))
-            }
+            if (headers.isNotEmpty() || rows.isNotEmpty()) tables.add(TableInfo(headers, rows))
         }
         return tables
+    }
+
+    private fun extractCodeBlocks(html: String): List<CodeBlock> {
+        val blocks = mutableListOf<CodeBlock>()
+        Regex("""<pre[^>]*>(.*?)</pre>""", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(html).forEach { match ->
+            blocks.add(CodeBlock(null, stripTags(match.groupValues[1])))
+        }
+        Regex("""<code[^>]*>(.*?)</code>""", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(html).forEach { match ->
+            val content = stripTags(match.groupValues[1])
+            if (content.length > 20) blocks.add(CodeBlock(null, content))
+        }
+        return blocks
+    }
+
+    private fun extractImages(html: String, baseUrl: String): List<ImageInfo> {
+        val images = mutableListOf<ImageInfo>()
+        Regex("""<img[^>]+src=["']([^"']+)["'][^>]*>""", RegexOption.IGNORE_CASE).findAll(html).forEach { match ->
+            val src = resolveUrl(match.groupValues[1], baseUrl)
+            images.add(ImageInfo(src, "", 0, 0))
+        }
+        return images
     }
 
     private fun resolveUrl(href: String, baseUrl: String): String {
@@ -140,35 +130,16 @@ class BrowserEngine {
         val sb = StringBuilder()
         sb.append("# ${parsed.title}\n\n")
         sb.append("URL: ${parsed.url}\n\n")
-        
-        sb.append("## Summary\n")
-        sb.append("${parsed.bodyText.take(500)}...\n\n")
-        
+        sb.append("## Summary\n${parsed.bodyText.take(500)}...\n\n")
         sb.append("## Links (${parsed.links.size})\n")
         parsed.links.take(20).forEach { sb.append("- [${it.text}](${it.href})\n") }
         sb.append("\n")
-        
-        if (parsed.tables.isNotEmpty()) {
-            sb.append("## Tables (${parsed.tables.size})\n")
-            parsed.tables.forEachIndexed { i, t ->
-                sb.append("### Table ${i + 1}\n")
-                sb.append("Headers: ${t.headers.joinToString(" | ")}\n")
-                t.rows.take(5).forEach { row ->
-                    sb.append("| ${row.joinToString(" | ")} |\n")
-                }
-                sb.append("\n")
-            }
-        }
-        
         if (parsed.codeBlocks.isNotEmpty()) {
             sb.append("## Code Blocks (${parsed.codeBlocks.size})\n")
             parsed.codeBlocks.take(5).forEach { block ->
-                sb.append("```${block.language ?: ""}\n")
-                sb.append("${block.code.take(200)}\n")
-                sb.append("```\n\n")
+                sb.append("```\n${block.code.take(200)}\n```\n\n")
             }
         }
-        
         return sb.toString()
     }
 }
