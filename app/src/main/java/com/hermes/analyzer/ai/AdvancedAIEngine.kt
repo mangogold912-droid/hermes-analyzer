@@ -20,6 +20,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.Executors
 import com.hermes.analyzer.ai.AIMultiEngine
+import com.hermes.analyzer.ai.LocalLLMEngine
 import com.hermes.analyzer.model.ChatMessage
 
 /**
@@ -68,6 +69,7 @@ class AdvancedAIEngine(private val context: Context) {
     private val orchestrator: ToolOrchestrator = ToolOrchestrator(pluginEngine)
     private val reflection: ReflectionEngine = ReflectionEngine(planner, pluginEngine)
     private val multiEngine: AIMultiEngine = AIMultiEngine(context)
+    private val localLLM: LocalLLMEngine = LocalLLMEngine(context)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -1083,8 +1085,36 @@ class AdvancedAIEngine(private val context: Context) {
     /**
      * Cleanup resources
      */
+    // ==================== LOCAL LLM ====================
+
+    /** Check if local LLM model is downloaded and ready */
+    fun isLocalLLMReady(): Boolean = localLLM.isModelReady()
+
+    /** Get local LLM status info */
+    fun getLocalLLMInfo(): String = localLLM.getDownloadInfo()
+
+    /** Download local LLM model (~1.3GB) */
+    fun downloadLocalLLM(
+        onProgress: (Int, Long, Long) -> Unit,
+        onComplete: (Boolean, String) -> Unit
+    ) {
+        localLLM.onDownloadProgress = { p, d, t -> onProgress(p, d, t) }
+        localLLM.downloadModel(onProgress, onComplete)
+    }
+
+    /** Delete local LLM to free space */
+    fun deleteLocalLLM() = localLLM.deleteModel()
+
+    /** Initialize local LLM engine */
+    fun initLocalLLM(): Boolean = localLLM.initialize()
+
+    /** Generate response using local LLM */
+    suspend fun generateWithLocalLLM(prompt: String): String =
+        localLLM.generateResponseAsync(prompt)
+
     fun destroy() {
         scope.cancel()
+        localLLM.destroy()
     }
 
     init {
@@ -1103,13 +1133,16 @@ class AdvancedAIEngine(private val context: Context) {
      */
     suspend fun chatWithParallelAI(userMessage: String, filePath: String? = null): String {
         val activePlatforms = getActivePlatforms()
-        if (activePlatforms.isEmpty()) {
-            return "**No AI API keys configured.**\n\nPlease set API keys in Settings for 8-platform parallel analysis."
+
+        // No API keys + no local LLM → local rule-based analysis
+        if (activePlatforms.isEmpty() && !localLLM.isModelReady()) {
+            return generateLocalFallbackResponse(userMessage, filePath)
         }
 
-        val sb = StringBuilder()
-        sb.append("## 8 AI Parallel Analysis\n\n")
-        sb.append("Platforms: ${activePlatforms.joinToString()} (${activePlatforms.size})\n\n")
+        // No API keys but local LLM ready → use local LLM
+        if (activePlatforms.isEmpty() && localLLM.isModelReady()) {
+            return generateLocalFallbackResponse(userMessage, filePath)
+        }
 
         val results = mutableListOf<Pair<String, String>>()
 
@@ -1117,26 +1150,41 @@ class AdvancedAIEngine(private val context: Context) {
             activePlatforms.map { platform ->
                 async(Dispatchers.IO) {
                     try {
-                        // Use the AI engine's native chat via HTTP
                         val response = chatSinglePlatform(platform, userMessage)
-                        platform to response
+                        val isError = response.startsWith("Error ") || 
+                            response.startsWith("[No API key") ||
+                            response.contains("quota", true) ||
+                            response.contains("Invalid API key", true) ||
+                            response.contains("Rate limit", true) ||
+                            response.contains("Authentication", true)
+                        platform to if (isError) "" else response
                     } catch (e: Exception) {
-                        platform to "Error: ${e.message}"
+                        platform to ""
                     }
                 }
             }.awaitAll().forEach { results.add(it) }
         }
 
-        results.forEach { (platform, response) ->
+        val successes = results.filter { it.second.isNotBlank() }
+
+        // ALL APIs failed → use local LLM or rule-based
+        if (successes.isEmpty()) {
+            return generateLocalFallbackResponse(userMessage, filePath)
+        }
+
+        val sb = StringBuilder()
+        sb.append("## 8 AI Parallel Analysis\n\n")
+        sb.append("Platforms responded: ${successes.size}/${activePlatforms.size}\n\n")
+
+        successes.forEach { (platform, response) ->
             sb.append("### **${platform.replaceFirstChar { it.uppercase() }}**\n")
             sb.append("```\n${response.take(1500)}\n```\n\n")
         }
 
-        val bestResponse = results.maxByOrNull { it.second.length }?.second ?: "No response"
+        val bestResponse = successes.maxByOrNull { it.second.length }?.second ?: ""
         sb.append("---\n\n")
         sb.append("### Combined Best Answer\n\n")
         sb.append(bestResponse.take(3000))
-
         return sb.toString()
     }
 
@@ -1154,5 +1202,141 @@ class AdvancedAIEngine(private val context: Context) {
             "Error ($platform): ${e.message}"
         }
     }
+
+    // ==================== LOCAL FALLBACK ANALYSIS ====================
+
+    /**
+     * LOCAL FALLBACK: API failure origin blocking.
+     * Tries local LLM first, then rule-based analysis.
+     * Users NEVER see raw API errors.
+     */
+    private fun generateLocalFallbackResponse(userMessage: String, filePath: String?): String {
+        // Try Local LLM first if model is available
+        if (localLLM.isModelReady()) {
+            if (localLLM.initialize()) {
+                val prompt = buildLocalLLMPrompt(userMessage, filePath)
+                return try {
+                    val response = runBlocking { localLLM.generateResponseAsync(prompt) }
+                    "## Local LLM (Gemma 2B IT) Analysis\n\n$response\n\n---\n*Generated by on-device AI — no external API used*"
+                } catch (e: Exception) {
+                    Log.w(TAG, "Local LLM failed, using rule-based: ${e.message}")
+                    generateRuleBasedFallback(userMessage, filePath)
+                }
+            }
+        }
+        return generateRuleBasedFallback(userMessage, filePath)
+    }
+
+    private fun buildLocalLLMPrompt(userMessage: String, filePath: String?): String {
+        val sb = StringBuilder()
+        sb.append("You are an expert reverse engineering and malware analysis AI assistant. ")
+        sb.append("Provide a thorough, professional analysis.\n\n")
+        sb.append("User request: $userMessage\n")
+        if (filePath != null && File(filePath).exists()) {
+            val file = File(filePath)
+            sb.append("\nTarget file: $filePath\n")
+            sb.append("File size: ${formatFileSize(file.length())}\n")
+            val fileType = detectFileType(filePath)
+            sb.append("File type: $fileType\n")
+        }
+        sb.append("\nProvide structured analysis with technical depth.")
+        return sb.toString()
+    }
+
+    private fun generateRuleBasedFallback(userMessage: String, filePath: String?): String {
+        val sb = StringBuilder()
+        sb.append("## Hermes Local AI Analysis\n\n")
+
+        if (filePath != null && File(filePath).exists()) {
+            val fileType = detectFileType(filePath)
+            sb.append("### Target File\n")
+            sb.append("- Path: $filePath\n")
+            sb.append("- Type: $fileType\n")
+            sb.append("- Size: ${formatFileSize(File(filePath).length())}\n\n")
+
+            val features = extractLocalFeatures(filePath, fileType)
+            sb.append("### Extracted Features\n")
+            features.forEach { (k, v) ->
+                val cleanK = k.replace("_", " ").replaceFirstChar { it.uppercase() }
+                sb.append("**$cleanK**: ${v.toString().take(200)}${if (v.toString().length > 200) "..." else ""}\n\n")
+            }
+
+            sb.append("### Security Analysis\n")
+            if (features.containsKey("urls")) sb.append("- Network indicators found in strings\n")
+            if (features.containsKey("crypto_refs")) sb.append("- Cryptographic references detected\n")
+            if (features.containsKey("ips")) sb.append("- Hardcoded IP addresses found\n")
+            if (!features.containsKey("urls") && !features.containsKey("crypto_refs") && !features.containsKey("ips"))
+                sb.append("- No obvious network/crypto indicators\n")
+
+            sb.append("\n### Reverse Engineering Guidance\n")
+            when (fileType) {
+                "apk" -> {
+                    sb.append("1. Decode with APKTool, decompile DEX with JADX\n")
+                    sb.append("2. Check AndroidManifest for components/permissions\n")
+                    sb.append("3. Look for native libraries (.so) in lib/\n")
+                    sb.append("4. Search for hardcoded keys, URLs, API endpoints\n")
+                }
+                "elf", "so" -> {
+                    sb.append("1. Check ELF header with readelf/objdump\n")
+                    sb.append("2. List symbols and PLT/GOT entries\n")
+                    sb.append("3. Use Radare2 for disassembly\n")
+                    sb.append("4. Check .init_array for constructors\n")
+                }
+                "dex" -> {
+                    sb.append("1. Decompile with JADX for Java source\n")
+                    sb.append("2. Check class hierarchy and obfuscation\n")
+                    sb.append("3. Look for reflection, dynamic loading\n")
+                }
+                else -> {
+                    sb.append("1. Identify type using magic bytes\n")
+                    sb.append("2. Extract strings for embedded clues\n")
+                    sb.append("3. Check entropy for packed sections\n")
+                }
+            }
+        } else {
+            sb.append("**Query**: $userMessage\n\n")
+            val lowerQ = userMessage.lowercase()
+            when {
+                lowerQ.contains("apk") -> {
+                    sb.append("### APK Analysis Guide\n")
+                    sb.append("Static: APKTool → JADX → Manifest analysis\n")
+                    sb.append("Dynamic: Frida for runtime hooking\n")
+                    sb.append("Native: Check lib/ for .so files\n")
+                    sb.append("Upload an APK for automated analysis.\n")
+                }
+                lowerQ.contains("elf") || lowerQ.contains("so") -> {
+                    sb.append("### ELF Analysis Guide\n")
+                    sb.append("Static: readelf, objdump, Radare2\n")
+                    sb.append("Dynamic: gdb, lldb debugging\n")
+                    sb.append("Decompile: Ghidra, IDA Pro\n")
+                }
+                else -> {
+                    sb.append("### RE Assistance\n")
+                    sb.append("- APK: Decompile, extract strings, vuln scan\n")
+                    sb.append("- ELF: Disassembly, exploitation analysis\n")
+                    sb.append("- Network: API discovery, protocol analysis\n")
+                    sb.append("Upload a file or ask specific questions.\n")
+                }
+            }
+        }
+
+        sb.append("\n---\n")
+        sb.append("*Powered by Hermes Local Analysis Engine*")
+        sb.append(" | Download local LLM in Settings for AI-quality responses")
+        return sb.toString()
+    }
+
+    private fun detectFileType(filePath: String): String {
+        val ext = filePath.substringAfterLast('.', "").lowercase()
+        return when (ext) {
+            "apk" -> "apk"
+            "elf", "so", "o" -> "elf"
+            "dex" -> "dex"
+            "jar" -> "jar"
+            "zip" -> "zip"
+            else -> "binary"
+        }
+    }
 }
+
 
