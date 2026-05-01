@@ -92,7 +92,10 @@ class AdvancedAIEngine(private val context: Context) {
 
     fun saveApiKey(platform: String, key: String): Boolean {
         if (key.isBlank() || platform !in ALL_PLATFORMS) return false
-        prefs.edit().putString("apikey_$platform", key.trim()).apply()
+        val trimmed = key.trim()
+        prefs.edit().putString("apikey_$platform", trimmed).apply()
+        // Also sync to AIMultiEngine so chatWithParallelAI can find it
+        multiEngine.saveKey(platform, trimmed)
         Log.i(TAG, "API key saved: $platform")
         return true
     }
@@ -870,6 +873,12 @@ class AdvancedAIEngine(private val context: Context) {
 
     init {
         loadDownloadedTools()
+        // Sync API keys from our prefs to AIMultiEngine on startup
+        ALL_PLATFORMS.forEach { platform ->
+            prefs.getString("apikey_$platform", null)?.let { key ->
+                if (key.isNotBlank()) multiEngine.saveKey(platform, key)
+            }
+        }
     }
     // ==================== 8 AI PARALLEL CHAT ====================
 
@@ -877,14 +886,14 @@ class AdvancedAIEngine(private val context: Context) {
      * Send message to all 8 AI platforms in parallel and combine results
      */
     suspend fun chatWithParallelAI(userMessage: String, filePath: String? = null): String {
-        val activePlatforms = multiEngine.getPlatforms().filter { p -> p.enabled && !p.apiKey.isNullOrBlank() }
+        val activePlatforms = getActivePlatforms()
         if (activePlatforms.isEmpty()) {
             return "**No AI API keys configured.**\n\nPlease set API keys in Settings for 8-platform parallel analysis."
         }
 
         val sb = StringBuilder()
         sb.append("## 8 AI Parallel Analysis\n\n")
-        sb.append("Platforms: ${activePlatforms.joinToString { it.name }} (${activePlatforms.size})\n\n")
+        sb.append("Platforms: ${activePlatforms.joinToString()} (${activePlatforms.size})\n\n")
 
         val results = mutableListOf<Pair<String, String>>()
 
@@ -893,10 +902,10 @@ class AdvancedAIEngine(private val context: Context) {
                 async(Dispatchers.IO) {
                     try {
                         // Use the AI engine's native chat via HTTP
-                        val response = chatSinglePlatform(platform.name, userMessage)
-                        platform.name to response
+                        val response = chatSinglePlatform(platform, userMessage)
+                        platform to response
                     } catch (e: Exception) {
-                        platform.name to "Error: ${e.message}"
+                        platform to "Error: ${e.message}"
                     }
                 }
             }.awaitAll().forEach { results.add(it) }
