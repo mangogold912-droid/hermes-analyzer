@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.view.Gravity
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import java.io.File
 import androidx.appcompat.app.AlertDialog
 
@@ -22,7 +21,6 @@ class DashboardActivity : AppCompatActivity() {
 
         val prefs = getSharedPreferences("hermes_dashboard", MODE_PRIVATE)
 
-        // Header
         root.addView(TextView(this).apply {
             text = "Hermes Analyzer Dashboard"
             textSize = 22f
@@ -30,7 +28,6 @@ class DashboardActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
         })
 
-        // Status cards
         val card = { title: String, value: String ->
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -50,6 +47,7 @@ class DashboardActivity : AppCompatActivity() {
         root.addView(card("Sandbox", if (File(filesDir, "sandbox").exists()) "Active" else "Ready"))
         root.addView(card("GitHub", prefs.getString("github_status", "Not connected") ?: "Not connected"))
         root.addView(card("IDA MCP", prefs.getString("ida_status", "Built-in server ready") ?: "Built-in server ready"))
+        root.addView(card("Network", "Auto-detecting..."))
 
         val recent = prefs.getStringSet("recent_files", emptySet())?.toList() ?: emptyList()
         root.addView(card("Recent Files", if (recent.isEmpty()) "No files yet" else recent.take(5).joinToString("\n") { "- ${it.substringAfterLast("/")}" }))
@@ -60,7 +58,6 @@ class DashboardActivity : AppCompatActivity() {
         root.addView(card("Success Rate", "${rate}% (${success}/${success + fail})"))
         root.addView(card("AI Suggestion", "Try uploading an APK or ELF file for autonomous analysis"))
 
-        // Action buttons grid
         val grid = GridLayout(this).apply {
             columnCount = 2
             setPadding(32, 32, 32, 32)
@@ -77,7 +74,12 @@ class DashboardActivity : AppCompatActivity() {
         grid.addView(btn("Plugins") { startActivity(Intent(this, PluginManagerActivity::class.java)) })
         grid.addView(btn("Agents") { startActivity(Intent(this, AgentStatusActivity::class.java)) })
         grid.addView(btn("Terminal") { startActivity(Intent(this, TerminalActivity::class.java)) })
-        grid.addView(btn("Browser") { Toast.makeText(this, "Browser: Coming soon", Toast.LENGTH_SHORT).show() })
+        grid.addView(btn("Browser") { startActivity(Intent(this, EnhancedBrowserActivity::class.java)) })
+        grid.addView(btn("Files") { startActivity(Intent(this, FileManagerActivity::class.java)) })
+        grid.addView(btn("GitHub") { startActivity(Intent(this, GitHubIntegrationActivity::class.java)) })
+        grid.addView(btn("IDA") { startActivity(Intent(this, IDAMobileActivity::class.java)) })
+        grid.addView(btn("Sandbox") { startActivity(Intent(this, SandboxManagerActivity::class.java)) })
+        grid.addView(btn("Memory") { startActivity(Intent(this, MemoryManagerActivity::class.java)) })
         grid.addView(btn("Logs") {
             val logs = AuditLogManager(this).getRecentLogs(20)
             AlertDialog.Builder(this)
@@ -86,6 +88,7 @@ class DashboardActivity : AppCompatActivity() {
                 .setPositiveButton("OK", null)
                 .show()
         })
+        grid.addView(btn("Settings") { startActivity(Intent(this, SettingsActivity::class.java)) })
 
         root.addView(grid)
 
