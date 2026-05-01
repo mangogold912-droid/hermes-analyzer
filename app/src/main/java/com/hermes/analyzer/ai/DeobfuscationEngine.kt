@@ -6,6 +6,6 @@ import kotlinx.coroutines.withContext
 
 class DeobfuscationEngine(private val context: Context) {
     suspend fun analyze(filePath: String): String = withContext(Dispatchers.IO) {
-        "Deobfuscation analysis of $filePath: No obfuscation patterns detected in stub mode."
+        "Deobfuscation analysis of " + filePath + ": No obfuscation patterns detected in stub mode."
     }
 }
