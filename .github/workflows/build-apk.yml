@@ -30,16 +30,17 @@ jobs:
     - name: Build APK
       run: |
         set -o pipefail
-        ./gradlew clean assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log || true
-        echo "=== LAST 200 LINES OF BUILD LOG ===" 
-        tail -200 build.log
-        echo "=== END BUILD LOG ==="
-        # Also search for specific errors
-        grep -n "error:" build.log | head -30 || true
+        ./gradlew clean assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+        echo "=== BUILD SUCCESS ==="
     - name: Check APK
       run: |
         echo "=== APK Search ==="
         find app/build -name "*.apk" -ls
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "No debug APK dir"
+        if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+          echo "ERROR: APK not found!"
+          exit 1
+        fi
     - uses: actions/upload-artifact@v4
       if: always()
       with:
