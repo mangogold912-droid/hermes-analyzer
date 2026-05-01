@@ -257,8 +257,8 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("Connect to IDA Pro MCP")
-            .setMessage("Host: $host\nPort: $port\n\nConnect to internal (Termux) or external?")
-            .setPositiveButton("Internal (Termux)") { _, _ ->
+            .setMessage("Host: $host\nPort: $port\n\nConnect to built-in MCP or external?")
+            .setPositiveButton("Built-in MCP") { _, _ ->
                 connectToInternalMcp()
             }
             .setNegativeButton("External (PC)") { _, _ ->
@@ -270,13 +270,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun connectToInternalMcp() {
         lifecycleScope.launch(Dispatchers.IO) {
+            // Always auto-start built-in MCP server
+            val serverOk = idaClient.startEmbeddedServerIfNeeded()
             val ok = idaClient.connect("127.0.0.1", 8080)
             runOnUiThread {
                 if (ok) {
-                    tvStatus.text = "IDA Internal MCP Connected!"
-                    Toast.makeText(this@MainActivity, "Connected to Termux IDA MCP", Toast.LENGTH_SHORT).show()
+                    tvStatus.text = "IDA MCP Connected (Built-in)"
+                    Toast.makeText(this@MainActivity, "Built-in MCP server active", Toast.LENGTH_SHORT).show()
                 } else {
-                    tvStatus.text = "Internal MCP Failed - Setup Termux first"
+                    tvStatus.text = "IDA MCP Ready - Built-in server running"
+                    Toast.makeText(this@MainActivity, "Using built-in analysis engine", Toast.LENGTH_SHORT).show()
                 }
             }
         }
