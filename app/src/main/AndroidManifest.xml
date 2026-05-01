@@ -43,6 +43,11 @@
         <activity android:name=".SettingsActivity" />
         <activity android:name=".TermuxSetupActivity" />
         <activity android:name=".FileBrowserActivity" />
+        <activity android:name=".DashboardActivity" />
+        <activity android:name=".PluginManagerActivity" />
+        <activity android:name=".AgentStatusActivity" />
+        <activity android:name=".TerminalActivity" />
+        <activity android:name=".BrowserActivity" />
 
         <!-- Termux 연동 서비스 -->
         <service android:name=".termux.TermuxAutomationService"
