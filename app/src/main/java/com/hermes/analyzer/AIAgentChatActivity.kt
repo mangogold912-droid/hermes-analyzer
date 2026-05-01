@@ -253,43 +253,14 @@ class AIAgentChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun generateAiResponse(message: String): String {
-        val sb = StringBuilder()
-
-        // Check for goals in message
+    private suspend fun generateAiResponse(message: String): String {
         val intent = engine.parseIntent(message)
-
-        if (intent.goals.isNotEmpty()) {
-            sb.appendLine("I detected the following analysis goals:")
-            intent.goals.forEach { goal ->
-                sb.appendLine("- **$goal**")
-            }
-            sb.appendLine()
+        val filePath = intent.filePath ?: findRecentFile()
+        if ((intent.goals.isNotEmpty() || isAgentMode) && filePath != null) {
+            return engine.analyzeFileAutonomously(filePath, intent.fileType, message)
         }
-
-        if (intent.fileType != "auto") {
-            sb.appendLine("Detected file type: **${intent.fileType.uppercase()}**")
-            sb.appendLine()
-        }
-
-        val activePlatforms = engine.getActivePlatforms()
-        if (activePlatforms.isEmpty()) {
-            sb.appendLine("**No AI API keys configured.**")
-            sb.appendLine()
-            sb.appendLine("Please configure API keys in Settings to enable full AI capabilities.")
-            sb.appendLine()
-            sb.appendLine("For autonomous analysis, type:")
-            sb.appendLine("`agent analyze <file> for <goal>`")
-        } else {
-            sb.appendLine("**Active platforms**: ${activePlatforms.joinToString { it.capitalize() }}")
-            sb.appendLine()
-            sb.appendLine("To start autonomous analysis, specify a file path and goal.")
-            sb.appendLine("Example: \"agent analyze /sdcard/test.apk for security vulnerabilities\"")
-        }
-
-        return sb.toString()
+        return engine.chatWithParallelAI(message, filePath)
     }
-
     private fun handleApiKeyCommand(message: String): String {
         val parts = message.split(" ", limit = 3)
         if (parts.size >= 3 && parts[1] == "set") {
