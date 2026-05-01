@@ -26,37 +26,33 @@ class ChatGPTActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        val layout = LinearLayout(this)
+        layout.orientation = LinearLayout.VERTICAL
 
         val scrollView = ScrollView(this)
-        chatContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        chatContainer = LinearLayout(this)
+        chatContainer.orientation = LinearLayout.VERTICAL
         scrollView.addView(chatContainer)
         layout.addView(scrollView, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             0, 1.0f
         ))
 
-        val inputLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        inputEditText = EditText(this).apply {
-            hint = "메시지를 입력하세요..."
-        }
+        val inputLayout = LinearLayout(this)
+        inputLayout.orientation = LinearLayout.HORIZONTAL
+
+        inputEditText = EditText(this)
+        inputEditText.hint = "메시지를 입력하세요..."
         inputLayout.addView(inputEditText, LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f
         ))
 
-        sendButton = Button(this).apply {
-            text = "전송"
-            setOnClickListener { sendMessage() }
-        }
+        sendButton = Button(this)
+        sendButton.text = "전송"
+        sendButton.setOnClickListener { sendMessage() }
         inputLayout.addView(sendButton)
-        layout.addView(inputLayout)
 
+        layout.addView(inputLayout)
         setContentView(layout)
 
         addAIMessage("Hermes AI에 오신 것을 환영합니다. 파일을 업로드하시거나 질문을 입력해 주세요.")
@@ -78,20 +74,18 @@ class ChatGPTActivity : AppCompatActivity() {
     }
 
     private fun addUserMessage(text: String) {
-        val tv = TextView(this).apply {
-            this.text = "You: $text"
-            setPadding(16, 8, 16, 8)
-            setBackgroundColor(0xFFE3F2FD.toInt())
-        }
+        val tv = TextView(this)
+        tv.text = "You: " + text
+        tv.setPadding(16, 8, 16, 8)
+        tv.setBackgroundColor(0xFFE3F2FD.toInt())
         chatContainer.addView(tv)
     }
 
     private fun addAIMessage(text: String) {
-        val tv = TextView(this).apply {
-            this.text = "AI: $text"
-            setPadding(16, 8, 16, 8)
-            setBackgroundColor(0xFFF5F5F5.toInt())
-        }
+        val tv = TextView(this)
+        tv.text = "AI: " + text
+        tv.setPadding(16, 8, 16, 8)
+        tv.setBackgroundColor(0xFFF5F5F5.toInt())
         chatContainer.addView(tv)
     }
 }
