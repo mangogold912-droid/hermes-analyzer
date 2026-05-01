@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
         db = AnalysisDatabase(this)
         aiEngine = AIMultiEngine(this)
         idaClient = IDAMCPClient()
-        analyzer = BinaryAnalyzer()
+        analyzer = BinaryAnalyzer
         fileManager = FileManager(contentResolver)
         rl = ReinforcementLearning(this)
         nativeBridge = NativeBridge()
@@ -207,16 +207,16 @@ class MainActivity : AppCompatActivity() {
     private fun handleFile(uri: Uri) {
         try {
             val name = getFileName(uri)
-            val fileType = analyzer.detectFileType(name)
+            val fileType = analyzer.detectFileType(name.toByteArray())
             val cacheFile = File(cacheDir, name)
             contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(cacheFile).use { output -> input.copyTo(output) }
             }
             selectedFile = cacheFile
-            selectedFileType = fileType
+            selectedFileType = fileType.name
             val hash = fileManager.computeStreamingHash(uri)
             val size = cacheFile.length()
-            tvFileInfo.text = "Name: $name\nType: ${fileType.toUpperCase()}\nSize: ${formatSize(size)}\nSHA256: ${hash.take(16)}..."
+            tvFileInfo.text = "Name: $name\nType: ${fileType.name.toUpperCase()}\nSize: ${formatSize(size)}\nSHA256: ${hash.take(16)}..."
             appendLog("File loaded: $name ($fileType)")
 
             // Native C++ analysis
@@ -225,7 +225,7 @@ class MainActivity : AppCompatActivity() {
 
             val fileId = db.insertFile(FileInfo(
                 name = name, originalName = name, size = size,
-                fileType = fileType, filePath = cacheFile.absolutePath, hash = hash
+                fileType = fileType.name, filePath = cacheFile.absolutePath, hash = hash
             ))
             appendLog("DB id=$fileId")
         } catch (e: Exception) {
