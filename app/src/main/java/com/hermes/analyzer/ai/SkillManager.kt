@@ -220,11 +220,14 @@ md5sum "\${'$'}{input}" && sha256sum "\${'$'}{input}""""
     private fun generateBase64Skill(): String = """#!/system/bin/sh
 if [ -f "\${'$'}{input}" ]; then base64 "\${'$'}{input}"; else echo "\${'$'}{input}" | base64; fi"""
 
-    private fun generatePortScanSkill(): String = """#!/system/bin/sh
-for p in 22 80 443 8080 3000; do
-  timeout 1 bash -c "echo >/dev/tcp/\${input}/\${'\$'}p" 2>/dev/null && echo "Port \${'\$'}p: OPEN" || echo "Port \${'\$'}p: CLOSED"
-done"""
-
+    private fun generatePortScanSkill(): String {
+        val ports = listOf(22, 80, 443, 8080, 3000)
+        val sb = StringBuilder("#!/system/bin/sh\n")
+        for (port in ports) {
+            sb.append("timeout 1 bash -c \"echo >/dev/tcp/\${input}/$port\" 2>/dev/null && echo \"Port $port: OPEN\" || echo \"Port $port: CLOSED\"\n")
+        }
+        return sb.toString()
+    }
     private fun generateGenericSkill(description: String): String = """#!/system/bin/sh
 echo "Auto-generated skill for: $description"
 echo "Input received: \${'$'}{input}"
