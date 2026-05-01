@@ -158,7 +158,7 @@ class AIAgentChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun processMessage(message: String, fileUri: Uri?) {
+    private suspend fun processMessage(message: String, fileUri: Uri?) {
         val startTime = System.currentTimeMillis()
 
         handler.post { showStatus("AI is thinking...") }
@@ -233,7 +233,7 @@ class AIAgentChatActivity : AppCompatActivity() {
 
                 // Default: AI chat response
                 else -> {
-                    handler.post { showStatus("Generating response...") }
+                    handler.post { showStatus("Querying 8 AI platforms in parallel...") }
                     generateAiResponse(message)
                 }
             }
