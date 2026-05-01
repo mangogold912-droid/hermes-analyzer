@@ -316,7 +316,7 @@ class AIAgentChatActivity : AppCompatActivity() {
                 }
                 sb.append("\n")
             }
-            sb.append(engine.generateRuleBasedFallback(message, null))
+            sb.append(engine.generateLocalFallbackResponse(message, null))
         }
 
         sb.append("\n### 메타 인지 (Meta-Cognition)\n")
