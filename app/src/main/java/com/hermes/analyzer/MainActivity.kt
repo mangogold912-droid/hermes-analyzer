@@ -342,7 +342,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openChat() {
-        startActivity(Intent(this, ChatActivity::class.java))
+        startActivity(Intent(this, AIAgentChatActivity::class.java))
     }
 
     private fun openSettings() {
