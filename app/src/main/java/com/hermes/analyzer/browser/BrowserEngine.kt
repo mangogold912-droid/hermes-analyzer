@@ -88,17 +88,18 @@ class BrowserEngine {
     }
 
     private fun stripTags(html: String): String {
-        return html
-            .replace(Regex("<script[^>]*>.*?</script>", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE), " ")
-            .replace(Regex("<style[^>]*>.*?</style>", RegexOption.DOT_MATCHES_ALL + RegexOption.IGNORE_CASE), " ")
-            .replace(Regex("<[^>]+>"), " ")
-            .replace(Regex("&lt;"), "<")
-            .replace(Regex("&gt;"), ">")
-            .replace(Regex("&amp;"), "&")
-            .replace(Regex("&quot;"), "\"")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        var text = html
+        text = text.replace(Regex("<script[^>]*>.*?</script>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), " ")
+        text = text.replace(Regex("<style[^>]*>.*?</style>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), " ")
+        text = text.replace(Regex("<[^>]+>"), " ")
+        text = text.replace("&lt;", "<")
+        text = text.replace("&gt;", ">")
+        text = text.replace("&amp;", "&")
+        text = text.replace("&quot;", "\"")
+        text = text.replace(Regex("\s+"), " ")
+        return text.trim()
     }
+
 
     private fun extractTables(html: String): List<TableInfo> {
         val tables = mutableListOf<TableInfo>()
