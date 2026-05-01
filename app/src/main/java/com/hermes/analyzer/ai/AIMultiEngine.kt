@@ -423,7 +423,7 @@ class AIMultiEngine(context: Context) {
     private fun buildAnalysisPrompt(features: Map<String, Any>, fileType: String, jobType: String): String {
         val sb = StringBuilder()
         sb.appendLine("Analyze this $fileType binary file.")
-        sb.appendLine("Analysis type: ${jobType.uppercase()}")
+        sb.appendLine("Analysis type: ${jobType.toUpperCase()}")
         sb.appendLine()
 
         features["strings"]?.let {
