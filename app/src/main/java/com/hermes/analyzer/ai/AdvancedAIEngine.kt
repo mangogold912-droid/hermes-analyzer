@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.Executors
+import com.hermes.analyzer.ai.AIMultiEngine
+import com.hermes.analyzer.ai.ChatMessage
 
 /**
  * AdvancedAIEngine - Autonomous Reverse Engineering AI
@@ -65,6 +67,7 @@ class AdvancedAIEngine(private val context: Context) {
     private val planner: AgentPlanner = AgentPlanner()
     private val orchestrator: ToolOrchestrator = ToolOrchestrator(pluginEngine)
     private val reflection: ReflectionEngine = ReflectionEngine(planner, pluginEngine)
+    private val multiEngine: AIMultiEngine = AIMultiEngine(context)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -868,4 +871,53 @@ class AdvancedAIEngine(private val context: Context) {
     init {
         loadDownloadedTools()
     }
+}
+
+    // ==================== 8 AI PARALLEL CHAT ====================
+
+    /**
+     * Send message to all 8 AI platforms in parallel and combine results
+     */
+    suspend fun chatWithParallelAI(userMessage: String, filePath: String? = null): String {
+        val activePlatforms = multiEngine.getPlatforms().filter { it.enabled && !it.apiKey.isNullOrBlank() }
+        if (activePlatforms.isEmpty()) {
+            return "**No AI API keys configured.**\n\nPlease set API keys in Settings for 8-platform parallel analysis."
+        }
+
+        val sb = StringBuilder()
+        sb.append("## 8 AI Parallel Analysis\n\n")
+        sb.append("Platforms: ${activePlatforms.joinToString { it.name }} (${activePlatforms.size})\n\n")
+
+        val chatHistory = listOf(ChatMessage(role = "user", content = userMessage))
+        val results = mutableListOf<Pair<String, String>>()
+
+        coroutineScope {
+            activePlatforms.map { platform ->
+                async(Dispatchers.IO) {
+                    try {
+                        val response = multiEngine.chat(platform.name, chatHistory)
+                        platform.name to response
+                    } catch (e: Exception) {
+                        platform.name to "Error: ${e.message}"
+                    }
+                }
+            }.awaitAll().forEach { results.add(it) }
+        }
+
+        // Combine results
+        results.forEach { (platform, response) ->
+            sb.append("### **${platform.capitalize()}**\n")
+            sb.append("```\n${response.take(1500)}\n```\n\n")
+        }
+
+        // Best answer summary
+        val bestResponse = results.maxByOrNull { it.second.length }?.second ?: "No response"
+        sb.append("---\n\n")
+        sb.append("### Combined Best Answer\n\n")
+        sb.append(bestResponse.take(3000))
+
+        return sb.toString()
+    }
+
+
 }
