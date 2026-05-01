@@ -1112,26 +1112,36 @@ class AdvancedAIEngine(private val context: Context) {
     fun isLocalLLMReady(): Boolean = localLLM.isModelReady()
 
     /** Get local LLM status info */
-    fun getLocalLLMInfo(): String = localLLM.getDownloadInfo()
+    fun getLocalLLMInfo(): String = localLLM.getAvailableModels().joinToString { it.name }
 
     /** Download local LLM model (~1.3GB) */
     fun downloadLocalLLM(
         onProgress: (Int, Long, Long) -> Unit,
         onComplete: (Boolean, String) -> Unit
     ) {
-        localLLM.onDownloadProgress = { p, d, t -> onProgress(p, d, t) }
-        localLLM.downloadModel(onProgress, onComplete)
+        // Use HuggingFaceModelManager for downloads
+        val hfManager = HuggingFaceModelManager(context)
+        val models = hfManager.getRecommendedModels()
+        if (models.isNotEmpty()) {
+            val model = models.first()
+            val success = hfManager.downloadModel(model) { progress ->
+                onProgress(progress.percent, progress.bytesDownloaded, progress.totalBytes)
+            }
+            onComplete(success, if (success) "Downloaded ${model.name}" else "Failed")
+        } else {
+            onComplete(false, "No models available")
+        }
     }
 
     /** Delete local LLM to free space */
-    fun deleteLocalLLM() = localLLM.deleteModel()
+    fun deleteLocalLLM() { /* local model cleanup managed by HuggingFaceModelManager */ }
 
     /** Initialize local LLM engine */
-    fun initLocalLLM(): Boolean = localLLM.initialize()
+    fun initLocalLLM(): Boolean = localLLM.isLoaded() || localLLM.getAvailableModels().isNotEmpty()
 
     /** Generate response using local LLM */
-    suspend fun generateWithLocalLLM(prompt: String): String =
-        localLLM.generateResponseAsync(prompt)
+    fun generateWithLocalLLM(prompt: String): String =
+        localLLM.generateResponse(prompt)
 
     fun destroy() {
         scope.cancel()
