@@ -1243,7 +1243,7 @@ class AdvancedAIEngine(private val context: Context) {
      * Tries local LLM first, then rule-based analysis.
      * Users NEVER see raw API errors.
      */
-        private fun generateLocalFallbackResponse(userMessage: String, filePath: String?): String {
+        fun generateLocalFallbackResponse(userMessage: String, filePath: String?): String {
         val prompt = if (filePath != null) "Analyze file $filePath: $userMessage" else userMessage
         return try {
             localLLM.generateResponse(prompt)
