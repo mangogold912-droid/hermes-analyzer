@@ -29,32 +29,36 @@ jobs:
     - run: chmod +x gradlew
     - name: Build APK
       run: |
-        set -o pipefail
-        ./gradlew clean assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log || true
-        echo "=== BUILD COMPLETE ==="
-    - name: Check APK and Output Errors
-      if: always()
+        ./gradlew clean assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+        echo "=== BUILD SUCCESS ==="
+    - name: Upload Build Log on Failure
+      if: failure()
+      run: |
+        echo "=== LAST 100 LINES OF ERROR ==="
+        tail -100 build.log
+        echo "=== KOTLIN ERRORS ==="
+        grep -n "\.kt:" build.log | tail -20
+        echo "=== FULL ERROR LOG ==="
+        cat build.log
+    - uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-error-log
+        path: build.log
+    - name: Check APK
+      if: success()
       run: |
         echo "=== APK Search ==="
-        find app/build -name "*.apk" -ls 2>/dev/null || echo "No APK found"
-        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "No debug dir"
-        echo "=== LAST 50 LINES OF BUILD LOG ==="
-        tail -50 build.log
-        echo "=== ERROR PATTERNS ==="
-        grep -n "error:" build.log | tail -10 || echo "No 'error:' lines found"
+        find app/build -name "*.apk" -ls
+        ls -la app/build/outputs/apk/debug/
     - uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-log
-        path: build.log
-    - uses: actions/upload-artifact@v4
-      if: always()
+      if: success()
       with:
         name: HermesAnalyzer-Debug
         path: app/build/outputs/apk/debug/
         if-no-files-found: warn
     - name: Create Release
-      if: github.ref == 'refs/heads/main' && hashFiles('app/build/outputs/apk/debug/*.apk') != ''
+      if: success()
       uses: softprops/action-gh-release@v2
       with:
         files: app/build/outputs/apk/debug/*.apk
