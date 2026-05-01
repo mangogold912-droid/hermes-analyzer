@@ -31,7 +31,7 @@ class LocalLLMEngine(private val context: Context) {
 
         // MediaPipe class names (loaded via reflection)
         private const val MEDIAPIPE_LLM_CLASS = "com.google.mediapipe.tasks.genai.llminference.LlmInference"
-        private const val MEDIAPIPE_OPTIONS_CLASS = "com.google.mediapipe.tasks.genai.llminference.LlmInference$LlmInferenceOptions"
+        private const val MEDIAPIPE_OPTIONS_CLASS = "com.google.mediapipe.tasks.genai.llminference.LlmInference\$LlmInferenceOptions"
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -67,8 +67,8 @@ class LocalLLMEngine(private val context: Context) {
         return try {
             // Load MediaPipe classes via reflection
             val llmClass = Class.forName(MEDIAPIPE_LLM_CLASS)
-            val optionsClass = Class.forName("$MEDIAPIPE_LLM_CLASS\$LlmInferenceOptions")
-            val builderClass = Class.forName("$MEDIAPIPE_LLM_CLASS\$LlmInferenceOptions\$Builder")
+            val optionsClass = Class.forName(MEDIAPIPE_OPTIONS_CLASS)
+            val builderClass = Class.forName("${MEDIAPIPE_OPTIONS_CLASS}\$Builder")
 
             // Build options using reflection
             val builder = builderClass.getDeclaredConstructor().newInstance()
