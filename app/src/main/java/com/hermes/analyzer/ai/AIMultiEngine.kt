@@ -81,7 +81,7 @@ class AIMultiEngine(context: Context) {
         onProgress?.invoke(5, "Extracting binary features...")
 
         // Extract local analysis features
-        val analyzer = BinaryAnalyzer()
+        val analyzer = BinaryAnalyzer
         val features = analyzer.extractFeatures(filePath, fileType)
 
         onProgress?.invoke(10, "Building analysis prompt...")
@@ -485,7 +485,7 @@ class AIMultiEngine(context: Context) {
     }
 
     private fun extractJsonFromText(text: String): String {
-        val jsonRegex = "\{[\s\S]*\}".toRegex()
+        val jsonRegex = """\{[\s\S]*\}""".toRegex()
         return jsonRegex.find(text)?.value ?: run {
             // Create structured content from raw text
             JSONObject().apply {
