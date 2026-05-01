@@ -282,8 +282,8 @@ class AIOrchestrator(private val context: android.content.Context) {
     // Helper parsers
     private fun parseCodeAnalysis(text: String): CodeAnalyzerAgent.CodeAnalysis? {
         return CodeAnalyzerAgent.CodeAnalysis(
-            language = Regex("Language: (\w+)").find(text)?.groupValues?.get(1) ?: "unknown",
-            complexity = Regex("Complexity: (\d+)").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0,
+            language = Regex("""Language: (\w+)""").find(text)?.groupValues?.get(1) ?: "unknown",
+            complexity = Regex("""Complexity: (\d+)""").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0,
             issues = emptyList(),
             functions = emptyList(),
             dependencies = emptyList(),
@@ -293,9 +293,9 @@ class AIOrchestrator(private val context: android.content.Context) {
 
     private fun parseSecurityReport(text: String): SecurityInspectorAgent.SecurityReport? {
         return SecurityInspectorAgent.SecurityReport(
-            score = Regex("Score: (\d+)").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 100,
-            criticalCount = Regex("Critical: (\d+)").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0,
-            warningCount = Regex("Warnings: (\d+)").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0,
+            score = Regex("""Score: (\d+)""").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 100,
+            criticalCount = Regex("""Critical: (\d+)""").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0,
+            warningCount = Regex("""Warnings: (\d+)""").find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0,
             infoCount = 0,
             findings = emptyList(),
             recommendations = emptyList()
@@ -304,9 +304,9 @@ class AIOrchestrator(private val context: android.content.Context) {
 
     private fun parseBinaryInfo(text: String): Map<String, String> {
         return mapOf(
-            "type" to (Regex("Type: ([\w/]+)").find(text)?.groupValues?.get(1) ?: "unknown"),
-            "strings" to (Regex("Strings: (\d+)").find(text)?.groupValues?.get(1) ?: "0"),
-            "suspicious" to (Regex("Suspicious: (\d+)").find(text)?.groupValues?.get(1) ?: "0")
+            "type" to (Regex("""Type: ([\w/]+)""").find(text)?.groupValues?.get(1) ?: "unknown"),
+            "strings" to (Regex("""Strings: (\d+)""").find(text)?.groupValues?.get(1) ?: "0"),
+            "suspicious" to (Regex("""Suspicious: (\d+)""").find(text)?.groupValues?.get(1) ?: "0")
         )
     }
 }
