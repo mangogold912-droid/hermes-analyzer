@@ -21,6 +21,8 @@ import java.util.Date
 import java.util.concurrent.Executors
 import com.hermes.analyzer.ai.AIMultiEngine
 import com.hermes.analyzer.ai.LocalLLMEngine
+import com.hermes.analyzer.ai.SelfReinforcementEngine
+import com.hermes.analyzer.ai.AdvancedCognitiveEngine
 import com.hermes.analyzer.model.ChatMessage
 
 /**
@@ -68,6 +70,8 @@ class AdvancedAIEngine(private val context: Context) {
     private val planner: AgentPlanner = AgentPlanner()
     private val orchestrator: ToolOrchestrator = ToolOrchestrator(pluginEngine)
     private val reflection: ReflectionEngine = ReflectionEngine(planner, pluginEngine)
+    private val reinforcement: SelfReinforcementEngine = SelfReinforcementEngine(context)
+    private val cognitive: AdvancedCognitiveEngine = AdvancedCognitiveEngine(context)
     private val multiEngine: AIMultiEngine = AIMultiEngine(context)
     private val localLLM: LocalLLMEngine = LocalLLMEngine(context)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -272,6 +276,22 @@ class AdvancedAIEngine(private val context: Context) {
         sb.append("**Analysis completed in ${duration / 1000}s**\n")
         sb.append("**Local plugins**: ${pluginResults.size}\n")
         sb.append("**AI platforms**: ${activePlatforms.size}/8 active\n")
+
+        // === Step 5: Self-reinforcement learning ===
+        val hasDeepAnalysis = activePlatforms.isNotEmpty() || localLLM.isModelReady()
+        reinforcement.recordOutcome("autonomous_analysis", hasDeepAnalysis, duration, if (hasDeepAnalysis) 0.8 else 0.4, mapOf("fileType" to fileType, "pluginsUsed" to pluginResults.size.toString()))
+
+        // === Step 6: Cognitive analysis summary ===
+        val intent = cognitive.inferIntent(userGoal, fileType)
+        cognitive.addToWorkingMemory("Analyzed $fileType: ${intent.primaryType} intent (confidence: ${intent.confidence})", AdvancedCognitiveEngine.MemoryType.OUTCOME, listOf("analysis", fileType))
+        val reflection = cognitive.selfReflect(sb.toString(), duration)
+        if (reflection.issues.isNotEmpty()) {
+            sb.append("
+### Self-Improvement Notes
+")
+            reflection.issues.take(3).forEach { sb.append("- $it
+") }
+        }
 
         return sb.toString()
     }
@@ -1114,6 +1134,8 @@ class AdvancedAIEngine(private val context: Context) {
 
     fun destroy() {
         scope.cancel()
+        reinforcement.destroy()
+        cognitive.destroy()
         localLLM.destroy()
     }
 
