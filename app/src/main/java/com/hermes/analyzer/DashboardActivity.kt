@@ -7,6 +7,8 @@ import android.view.Gravity
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import java.io.File
+import androidx.appcompat.app.AlertDialog
 
 class DashboardActivity : AppCompatActivity() {
 
@@ -75,7 +77,7 @@ class DashboardActivity : AppCompatActivity() {
         grid.addView(btn("Plugins") { startActivity(Intent(this, PluginManagerActivity::class.java)) })
         grid.addView(btn("Agents") { startActivity(Intent(this, AgentStatusActivity::class.java)) })
         grid.addView(btn("Terminal") { startActivity(Intent(this, TerminalActivity::class.java)) })
-        grid.addView(btn("Browser") { startActivity(Intent(this, BrowserActivity::class.java)) })
+        grid.addView(btn("Browser") { Toast.makeText(this, "Browser: Coming soon", Toast.LENGTH_SHORT).show() })
         grid.addView(btn("Logs") {
             val logs = AuditLogManager(this).getRecentLogs(20)
             AlertDialog.Builder(this)
