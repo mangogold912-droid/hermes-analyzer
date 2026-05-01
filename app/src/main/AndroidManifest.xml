@@ -43,6 +43,9 @@
         <activity android:name=".SettingsActivity" />
         <activity android:name=".TermuxSetupActivity" />
         <activity android:name=".FileBrowserActivity" />
+        <activity android:name=".SandboxManagerActivity" />
+        <activity android:name=".MemoryManagerActivity" />
+        <activity android:name=".AuditLogActivity" />
         <activity android:name=".DashboardActivity" />
         <activity android:name=".PluginManagerActivity" />
         <activity android:name=".AgentStatusActivity" />
