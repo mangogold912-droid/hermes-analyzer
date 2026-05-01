@@ -268,7 +268,6 @@ class IDAMCPClient {
         Log.d(TAG, msg)
         onLog?.invoke(msg)
     }
-}
 /**
      * Auto-start embedded MCP server if not running
      */
@@ -297,6 +296,7 @@ class IDAMCPClient {
                                 } else {
                                     writer.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
                                 }
+}
                                 writer.flush()
                             } catch (_: Exception) {}
                             finally { client.close() }
