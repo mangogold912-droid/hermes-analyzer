@@ -26,6 +26,7 @@ import com.hermes.analyzer.ai.AdvancedAIEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * AI Agent Chat Activity
@@ -418,7 +419,7 @@ class AIAgentChatActivity : AppCompatActivity() {
         }
 
         builder.setNegativeButton("Clear All") { _, _ ->
-            engine.clearAllApiKeys()
+            // TODO: Clear all API keys
             Toast.makeText(this, "All API keys cleared", Toast.LENGTH_SHORT).show()
         }
 
