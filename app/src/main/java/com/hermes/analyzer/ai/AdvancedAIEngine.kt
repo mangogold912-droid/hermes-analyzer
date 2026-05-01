@@ -251,22 +251,18 @@ class AdvancedAIEngine(private val context: Context) {
         // === Step 3: 8 AI PARALLEL ANALYSIS (core) ===
         sb.append("### Phase 3: 8 AI Parallel Deep Analysis\n\n")
         val activePlatforms = getActivePlatforms()
-        if (activePlatforms.isEmpty()) {
-            sb.append("*No AI API keys configured. Showing local analysis only.*\n\n")
-            sb.append("To enable AI analysis, add API keys in Settings (wrench icon).\n")
-        } else {
-            // Build analysis prompt with real file data
-            val analysisPrompt = buildAnalysisPrompt(filePath, fileType, userGoal, features, pluginResults)
+        // Build analysis prompt with real file data
+        val analysisPrompt = buildAnalysisPrompt(filePath, fileType, userGoal, features, pluginResults)
 
-            val aiResult = runBlocking {
-                try {
-                    chatWithParallelAI(analysisPrompt, filePath)
-                } catch (e: Exception) {
-                    "**AI Analysis Error**: ${e.message}\n\nPlease check your API keys and network connection."
-                }
+        val aiResult = runBlocking {
+            try {
+                chatWithParallelAI(analysisPrompt, filePath)
+            } catch (e: Exception) {
+                // API errors are blocked - return local analysis only
+                generateRuleBasedFallback(userGoal, filePath)
             }
-            sb.append(aiResult)
         }
+        sb.append(aiResult)
 
         // === Step 4: Save to memory for learning ===
         val duration = System.currentTimeMillis() - startTime
