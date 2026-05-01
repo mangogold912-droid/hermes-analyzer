@@ -216,7 +216,7 @@ class MainActivity : AppCompatActivity() {
             selectedFileType = fileType
             val hash = fileManager.computeStreamingHash(uri)
             val size = cacheFile.length()
-            tvFileInfo.text = "Name: $name\nType: ${fileType.uppercase()}\nSize: ${formatSize(size)}\nSHA256: ${hash.take(16)}..."
+            tvFileInfo.text = "Name: $name\nType: ${fileType.toUpperCase()}\nSize: ${formatSize(size)}\nSHA256: ${hash.take(16)}..."
             appendLog("File loaded: $name ($fileType)")
 
             // Native C++ analysis
