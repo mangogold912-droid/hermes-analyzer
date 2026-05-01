@@ -30,7 +30,12 @@ jobs:
     - name: Build APK
       run: |
         set -o pipefail
-        ./gradlew clean assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+        ./gradlew clean assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log || true
+        echo "=== LAST 200 LINES OF BUILD LOG ===" 
+        tail -200 build.log
+        echo "=== END BUILD LOG ==="
+        # Also search for specific errors
+        grep -n "error:" build.log | head -30 || true
     - name: Check APK
       run: |
         echo "=== APK Search ==="
@@ -66,3 +71,4 @@ jobs:
           - All files access
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
