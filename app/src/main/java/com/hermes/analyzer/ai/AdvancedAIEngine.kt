@@ -20,6 +20,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.Executors
 import com.hermes.analyzer.ai.AIMultiEngine
+import com.hermes.analyzer.model.ChatMessage
 
 /**
  * AdvancedAIEngine - Autonomous Reverse Engineering AI
@@ -902,7 +903,7 @@ class AdvancedAIEngine(private val context: Context) {
         }
 
         results.forEach { (platform, response) ->
-            sb.append("### **${platform.capitalize()}**\n")
+            sb.append("### **${platform.replaceFirstChar { it.uppercase() }}**\n")
             sb.append("```\n${response.take(1500)}\n```\n\n")
         }
 
@@ -916,19 +917,17 @@ class AdvancedAIEngine(private val context: Context) {
 
     /**
      * Chat with a single AI platform via HTTP API
+     * Uses AIMultiEngine which has all 8 platforms implemented
      */
     private fun chatSinglePlatform(platform: String, message: String): String {
-        val apiKey = getApiKey(platform) ?: return "[No API key]"
-        return when (platform) {
-            AI_OPENAI -> chatOpenAI(apiKey, message)
-            AI_KIMI -> chatKimi(apiKey, message)
-            AI_QWEN -> chatQwen(apiKey, message)
-            AI_GEMINI -> chatGemini(apiKey, message)
-            AI_CLAUDE -> chatClaude(apiKey, message)
-            AI_DEEPSEEK -> chatDeepSeek(apiKey, message)
-            AI_OLLAMA -> chatOllama(apiKey, message)
-            AI_SUPRNINJA -> chatSuprninja(apiKey, message)
-            else -> "Unknown platform: $platform"
+        val apiKey = getApiKey(platform) ?: return "[No API key for $platform]"
+        return try {
+            runBlocking {
+                multiEngine.chat(platform, listOf(ChatMessage(role = "user", content = message)))
+            }
+        } catch (e: Exception) {
+            "Error ($platform): ${e.message}"
         }
     }
 }
+
