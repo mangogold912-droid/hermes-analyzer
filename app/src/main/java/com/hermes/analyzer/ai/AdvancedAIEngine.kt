@@ -16,6 +16,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.concurrent.Executors
 
 /**
@@ -290,7 +292,7 @@ class AdvancedAIEngine(private val context: Context) {
     // ==================== 4. TOOL DISCOVERY & DOWNLOAD ====================
 
     private fun findMissingTools(toolIds: List<String>): List<String> {
-        val available = pluginEngine.getAvailablePlugins().map { it.id }
+        val available = PluginEngine.BUILTIN_PLUGINS.map { p -> p.id }
         return toolIds.filter { it !in available && it != "ai_synthesis" }
     }
 
