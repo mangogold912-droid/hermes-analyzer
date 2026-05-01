@@ -545,9 +545,32 @@ class AdvancedAIEngine(private val context: Context) {
      */
     private suspend fun discoverAndDownloadTool(toolId: String): String {
         // Search GitHub for the tool
-        val searchResult = searchGitHubForTool(toolId)
+        val searchResult = try {
+            val query = URLEncoder.encode("$toolId reverse engineering tool android", "UTF-8")
+            val url = URL("${GITHUB_API}/search/repositories?q=$query&sort=stars&order=desc&per_page=5")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            conn.setRequestProperty("User-Agent", "Hermes-Analyzer")
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+            conn.requestMethod = "GET"
+            val responseCode = conn.responseCode
+            val body = conn.inputStream.bufferedReader().use { it.readText() }
+            if (responseCode == 200) {
+                val json = JSONObject(body)
+                val items = json.optJSONArray("items")
+                if (items != null && items.length() > 0) {
+                    val first = items.getJSONObject(0)
+                    val fullName = first.getString("full_name")
+                    val htmlUrl = first.getString("html_url")
+                    Pair(fullName, htmlUrl)
+                } else null
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+
         if (searchResult == null) {
-            // Fallback: search web
             val webResult = searchWebForTool(toolId)
             return if (webResult != null) {
                 "Found info: $webResult (manual install required)"
@@ -557,33 +580,6 @@ class AdvancedAIEngine(private val context: Context) {
         }
 
         return "Found on GitHub: ${searchResult.first} - ${searchResult.second}"
-    }
-
-    private suspend fun searchGitHubForTool(toolName: String): Pair<String, String>? {
-        return try {
-            val query = URLEncoder.encode("$toolName reverse engineering tool android", "UTF-8")
-            val url = URL("${GITHUB_API}/search/repositories?q=$query&sort=stars&order=desc&per_page=5")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
-            conn.setRequestProperty("User-Agent", "Hermes-Analyzer")
-            conn.connectTimeout = 10000
-            conn.readTimeout = 10000
-
-            val response = conn.inputStream.bufferedReader().use { it.readText() }
-            val json = JSONObject(response)
-            val items = json.optJSONArray("items")
-
-            if (items != null && items.length() > 0) {
-                val first = items.getJSONObject(0)
-                val name = first.getString("full_name")
-                val desc = first.optString("description", "No description")
-                val stars = first.optInt("stargazers_count", 0)
-                Pair(name, "$desc ($stars stars)")
-            } else null
-        } catch (e: Exception) {
-            Log.w(TAG, "GitHub search failed: ${e.message}")
-            null
-        }
     }
 
     private suspend fun searchWebForTool(toolName: String): String? {
