@@ -20,7 +20,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.Executors
 import com.hermes.analyzer.ai.AIMultiEngine
-import com.hermes.analyzer.ai.ChatMessage
 
 /**
  * AdvancedAIEngine - Autonomous Reverse Engineering AI
@@ -871,15 +870,13 @@ class AdvancedAIEngine(private val context: Context) {
     init {
         loadDownloadedTools()
     }
-}
-
     // ==================== 8 AI PARALLEL CHAT ====================
 
     /**
      * Send message to all 8 AI platforms in parallel and combine results
      */
     suspend fun chatWithParallelAI(userMessage: String, filePath: String? = null): String {
-        val activePlatforms = multiEngine.getPlatforms().filter { it.enabled && !it.apiKey.isNullOrBlank() }
+        val activePlatforms = multiEngine.getPlatforms().filter { p -> p.enabled && !p.apiKey.isNullOrBlank() }
         if (activePlatforms.isEmpty()) {
             return "**No AI API keys configured.**\n\nPlease set API keys in Settings for 8-platform parallel analysis."
         }
@@ -888,14 +885,14 @@ class AdvancedAIEngine(private val context: Context) {
         sb.append("## 8 AI Parallel Analysis\n\n")
         sb.append("Platforms: ${activePlatforms.joinToString { it.name }} (${activePlatforms.size})\n\n")
 
-        val chatHistory = listOf(ChatMessage(role = "user", content = userMessage))
         val results = mutableListOf<Pair<String, String>>()
 
         coroutineScope {
             activePlatforms.map { platform ->
                 async(Dispatchers.IO) {
                     try {
-                        val response = multiEngine.chat(platform.name, chatHistory)
+                        // Use the AI engine's native chat via HTTP
+                        val response = chatSinglePlatform(platform.name, userMessage)
                         platform.name to response
                     } catch (e: Exception) {
                         platform.name to "Error: ${e.message}"
@@ -904,13 +901,11 @@ class AdvancedAIEngine(private val context: Context) {
             }.awaitAll().forEach { results.add(it) }
         }
 
-        // Combine results
         results.forEach { (platform, response) ->
             sb.append("### **${platform.capitalize()}**\n")
             sb.append("```\n${response.take(1500)}\n```\n\n")
         }
 
-        // Best answer summary
         val bestResponse = results.maxByOrNull { it.second.length }?.second ?: "No response"
         sb.append("---\n\n")
         sb.append("### Combined Best Answer\n\n")
@@ -919,5 +914,151 @@ class AdvancedAIEngine(private val context: Context) {
         return sb.toString()
     }
 
+    /**
+     * Chat with a single AI platform via HTTP API
+     */
+    private fun chatSinglePlatform(platform: String, message: String): String {
+        val apiKey = getApiKey(platform) ?: return "[No API key]"
+        return when (platform) {
+            AI_OPENAI -> chatOpenAI(apiKey, message)
+            AI_KIMI -> chatKimi(apiKey, message)
+            AI_QWEN -> chatQwen(apiKey, message)
+            AI_GEMINI -> chatGemini(apiKey, message)
+            AI_CLAUDE -> chatClaude(apiKey, message)
+            AI_DEEPSEEK -> chatDeepSeek(apiKey, message)
+            AI_OLLAMA -> chatOllama(apiKey, message)
+            AI_SUPRNINJA -> chatSuprninja(apiKey, message)
+            else -> "Unknown platform: $platform"
+        }
+    }
+
+    private fun chatOpenAI(apiKey: String, message: String): String {
+        return try {
+            val url = URL("https://api.openai.com/v1/chat/completions")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val body = "{"model":"gpt-4o-mini","messages":[{"role":"user","content":"${message.replace("\"", "\\"")}"}],"max_tokens":2000}"
+            conn.outputStream.write(body.toByteArray())
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+        } catch (e: Exception) { "OpenAI Error: ${e.message}" }
+    }
+
+    private fun chatKimi(apiKey: String, message: String): String {
+        return try {
+            val url = URL("https://api.moonshot.cn/v1/chat/completions")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val body = "{"model":"moonshot-v1-8k","messages":[{"role":"user","content":"${message.replace("\"", "\\"")}"}]}"
+            conn.outputStream.write(body.toByteArray())
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+        } catch (e: Exception) { "Kimi Error: ${e.message}" }
+    }
+
+    private fun chatQwen(apiKey: String, message: String): String {
+        return try {
+            val url = URL("https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val body = "{"model":"qwen-turbo","input":{"messages":[{"role":"user","content":"${message.replace("\"", "\\"")}"}]}}"
+            conn.outputStream.write(body.toByteArray())
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            json.getJSONObject("output").getString("text")
+        } catch (e: Exception) { "Qwen Error: ${e.message}" }
+    }
+
+    private fun chatGemini(apiKey: String, message: String): String {
+        return try {
+            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$apiKey")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val body = "{"contents":[{"parts":[{"text":"${message.replace("\"", "\\"")}"}]}]}"
+            conn.outputStream.write(body.toByteArray())
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            json.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+        } catch (e: Exception) { "Gemini Error: ${e.message}" }
+    }
+
+    private fun chatClaude(apiKey: String, message: String): String {
+        return try {
+            val url = URL("https://api.anthropic.com/v1/messages")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("x-api-key", apiKey)
+            conn.setRequestProperty("anthropic-version", "2023-06-01")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val body = "{"model":"claude-3-haiku-20240307","max_tokens":2000,"messages":[{"role":"user","content":"${message.replace("\"", "\\"")}"}]}"
+            conn.outputStream.write(body.toByteArray())
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            json.getJSONArray("content").getJSONObject(0).getString("text")
+        } catch (e: Exception) { "Claude Error: ${e.message}" }
+    }
+
+    private fun chatDeepSeek(apiKey: String, message: String): String {
+        return try {
+            val url = URL("https://api.deepseek.com/chat/completions")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Authorization", "Bearer $apiKey")
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            val body = "{"model":"deepseek-chat","messages":[{"role":"user","content":"${message.replace("\"", "\\"")}"}]}"
+            conn.outputStream.write(body.toByteArray())
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+        } catch (e: Exception) { "DeepSeek Error: ${e.message}" }
+    }
+
+    private fun chatOllama(apiKey: String, message: String): String {
+        return try {
+            val url = URL("http://localhost:11434/api/generate")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 5000
+            conn.readTimeout = 60000
+            val body = "{"model":"llama3","prompt":"${message.replace("\"", "\\"")}","stream":false}"
+            conn.outputStream.write(body.toByteArray())
+            val response = conn.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(response)
+            json.getString("response")
+        } catch (e: Exception) { "Ollama Error: ${e.message} (Is Ollama running locally?)" }
+    }
+
+    private fun chatSuprninja(apiKey: String, message: String): String {
+        return "Suprninja: Placeholder response for: ${message.take(50)}"
+    }
 
 }
