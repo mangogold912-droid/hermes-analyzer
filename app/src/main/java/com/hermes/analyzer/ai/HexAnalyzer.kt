@@ -235,7 +235,7 @@ class HexAnalyzer {
                 fields.add(StructureField("Section Header Offset", 40, 8, "uint64", "See value", "SH offset"))
             }
             magic.startsWith("50 4B 03 04") -> {
-                fields.add(StructureField("Local Header", 0, 30, "struct", "PK\x03\x04", "ZIP local file header"))
+                fields.add(StructureField("Local Header", 0, 30, "struct", "PK\u0003\u0004", "ZIP local file header"))
                 fields.add(StructureField("Version", 4, 2, "uint16", "See value", "ZIP version"))
                 fields.add(StructureField("Flags", 6, 2, "uint16", "See value", "General purpose flags"))
                 fields.add(StructureField("Compression", 8, 2, "uint16", "0/8", "Compression method"))
