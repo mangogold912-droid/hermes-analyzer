@@ -1258,7 +1258,7 @@ class AdvancedAIEngine(private val context: Context) {
         return sb.toString()
     }
 
-    private fun generateRuleBasedFallback(userMessage: String, filePath: String?): String {
+    fun generateRuleBasedFallback(userMessage: String, filePath: String?): String {
         val sb = StringBuilder()
         sb.append("## Hermes Local AI Analysis\n\n")
 
@@ -1341,17 +1341,7 @@ class AdvancedAIEngine(private val context: Context) {
         return sb.toString()
     }
 
-    private fun detectFileType(filePath: String): String {
-        val ext = filePath.substringAfterLast('.', "").lowercase()
-        return when (ext) {
-            "apk" -> "apk"
-            "elf", "so", "o" -> "elf"
-            "dex" -> "dex"
-            "jar" -> "jar"
-            "zip" -> "zip"
-            else -> "binary"
-        }
-    }
+
 
 
     // ==================== PUBLIC API FOR COGNITIVE & REINFORCEMENT ====================
