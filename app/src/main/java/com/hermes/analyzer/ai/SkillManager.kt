@@ -209,25 +209,25 @@ Status: JavaScript execution requires Node.js runtime
 
     // Built-in skill generators
     private fun generateHexDumpSkill(): String = """#!/system/bin/sh
-xxd -l 256 "\${input}" 2>/dev/null || hexdump -C "\${input}" | head -20"""
+xxd -l 256 "\${'$'}{input}" 2>/dev/null || hexdump -C "\${'$'}{input}" | head -20"""
 
     private fun generateStringExtractSkill(): String = """#!/system/bin/sh
-strings "\${input}" | head -50"""
+strings "\${'$'}{input}" | head -50"""
 
     private fun generateHashSkill(): String = """#!/system/bin/sh
-md5sum "\${input}" && sha256sum "\${input}""""
+md5sum "\${'$'}{input}" && sha256sum "\${'$'}{input}""""
 
     private fun generateBase64Skill(): String = """#!/system/bin/sh
-if [ -f "\${input}" ]; then base64 "\${input}"; else echo "\${input}" | base64; fi"""
+if [ -f "\${'$'}{input}" ]; then base64 "\${'$'}{input}"; else echo "\${'$'}{input}" | base64; fi"""
 
     private fun generatePortScanSkill(): String = """#!/system/bin/sh
 for port in 22 80 443 8080 3000; do
-  timeout 1 bash -c "echo >/dev/tcp/\${input}/\$port" 2>/dev/null && echo "Port \$port: OPEN" || echo "Port \$port: CLOSED"
+  timeout 1 bash -c "echo >/dev/tcp/\${'$'}{input}/\$port" 2>/dev/null && echo "Port \$port: OPEN" || echo "Port \$port: CLOSED"
 done"""
 
     private fun generateGenericSkill(description: String): String = """#!/system/bin/sh
 echo "Auto-generated skill for: $description"
-echo "Input received: \${input}"
+echo "Input received: \${'$'}{input}"
 echo "Processing..."
-ls -la "\${input}" 2>/dev/null || echo "\${input}"""
+ls -la "\${'$'}{input}" 2>/dev/null || echo "\${'$'}{input}"""
 }
