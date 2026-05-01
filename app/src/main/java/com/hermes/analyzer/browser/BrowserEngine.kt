@@ -62,9 +62,13 @@ class BrowserEngine {
             if (end == -1) break
             text = text.substring(0, start) + " " + text.substring(end + 1)
         }
-        return text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&quot;", "\\"").replace("  ", " ").trim()
+        text = text.replace("&lt;", "<")
+        text = text.replace("&gt;", ">")
+        text = text.replace("&amp;", "&")
+        text = text.replace("&quot;", "\"")
+        text = text.replace("  ", " ")
+        return text.trim()
     }
-
     private fun extractLinks(html: String, baseUrl: String): List<LinkInfo> {
         val links = mutableListOf<LinkInfo>()
         val pattern = Regex("""<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)</a>""", RegexOption.IGNORE_CASE)
