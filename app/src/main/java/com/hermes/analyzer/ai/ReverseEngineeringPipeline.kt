@@ -9,6 +9,6 @@ class ReverseEngineeringPipeline(private val context: Context) {
     suspend fun analyze(filePath: String): String = withContext(Dispatchers.IO) {
         val file = File(filePath)
         if (!file.exists()) return@withContext "File not found"
-        "Reverse engineering analysis of $filePath completed. Size: ${file.length()} bytes."
+        "Reverse engineering analysis of " + filePath + " completed. Size: " + file.length() + " bytes."
     }
 }
