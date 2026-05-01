@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         btnAnalyze.setOnClickListener { startAnalysis() }
         btnChat.setOnClickListener { openChat() }
         btnSettings.setOnClickListener { openSettings() }
-        btnTermux.setOnClickListener { setupTermux() }
+        btnTermux.setOnClickListener { openTerminal() }
         btnAllFiles.setOnClickListener { browseAllFiles() }
     }
 
@@ -179,6 +179,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
         startActivity(Intent(this, FileBrowserActivity::class.java))
+    }
+
+    private fun openTerminal() {
+        val intent = Intent(this, TerminalActivity::class.java)
+        intent.putStringArrayListExtra(TerminalActivity.EXTRA_COMMANDS, arrayListOf())
+        startActivity(intent)
     }
 
     private fun setupTermux() {
