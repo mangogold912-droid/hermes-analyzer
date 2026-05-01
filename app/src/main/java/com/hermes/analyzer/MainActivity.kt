@@ -129,7 +129,7 @@ class MainActivity : AppCompatActivity() {
         btnChat.setOnClickListener { openChat() }
         btnSettings.setOnClickListener { openSettings() }
         btnTermux.setOnClickListener { openTerminal() }
-        btnAllFiles.setOnClickListener { browseAllFiles() }
+        btnAllFiles.setOnClickListener { startActivity(Intent(this, DashboardActivity::class.java)) }
     }
 
     private fun checkPermissions() {
