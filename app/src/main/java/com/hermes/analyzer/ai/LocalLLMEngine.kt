@@ -346,4 +346,15 @@ Please provide:
 
     fun isLoaded(): Boolean = isModelLoaded
     fun getCurrentModel(): String = modelPath
+
+    // Backward-compatible wrappers for previous interface
+    fun isModelReady(): Boolean = isLoaded()
+    fun initialize(): Boolean = true
+    suspend fun generateResponseAsync(prompt: String): String = generateResponse(prompt)
+    fun getDownloadInfo(): Map<String, String> = emptyMap()
+    fun onDownloadProgress(callback: (Int, Long, Long) -> Unit) {}
+    fun downloadModel(modelId: String): Boolean = false
+    fun deleteModel(modelId: String) {}
+    fun destroy() {}
+
 }
