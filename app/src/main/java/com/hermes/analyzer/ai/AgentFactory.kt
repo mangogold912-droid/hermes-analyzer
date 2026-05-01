@@ -35,7 +35,7 @@ class AgentFactory(private val context: Context) {
     data class DynamicAgent(
         val id: String,
         val role: String,
-        val status: String, // idle, running, completed, destroyed
+        var status: String, // idle, running, completed, destroyed
         val createdAt: Long,
         var taskDescription: String = "",
         var result: String = ""
