@@ -31,12 +31,13 @@ jobs:
 
     - run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
 
-    - name: Find APK
-      id: find_apk
+    - name: Find APK path
+      id: apk
       run: |
-        APK=$(find app/build -name "*.apk" | head -1)
-        echo "apk=$APK" >> $GITHUB_OUTPUT
-        echo "APK: $APK"
+        APK=$(find app/build -name "*.apk" -print -quit)
+        echo "path=$APK" >> $GITHUB_OUTPUT
+        echo "APK found: $APK"
+        ls -lh "$APK"
 
     - uses: actions/upload-artifact@v4
       if: always()
@@ -50,23 +51,71 @@ jobs:
         path: app/build/outputs/apk/debug/
         if-no-files-found: warn
 
-    - name: Release
+    - name: Create Release with APK Asset
       if: github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v2
+      uses: actions/github-script@v7
       with:
-        files: app/build/outputs/apk/debug/*.apk
-        tag_name: v${{ github.run_number }}
-        name: Hermes Analyzer v${{ github.run_number }}
-        body: |
-          ## Hermes Analyzer v${{ github.run_number }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          const apkPath = '${{ steps.apk.outputs.path }}';
+          const tag = 'v' + context.runNumber;
 
-          ### Features
-          - 50 Reverse Engineering Plugins (RE Discord Community Tools)
-          - C++ Native Disassembler (Capstone)
-          - IDA Pro MCP Server Integration
-          - 8 AI Platforms Parallel Analysis
-          - AI Chat with Memory & Auto-Plugin Execution
-          - Built-in Terminal (xterm.js)
-          - MANAGE_EXTERNAL_STORAGE (All files access)
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          console.log('APK path:', apkPath);
+
+          if (!apkPath || !fs.existsSync(apkPath)) {
+            console.log('No APK found, skipping release asset');
+            // Still create release without asset
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: 'Hermes Analyzer ' + tag,
+              body: '## Hermes Analyzer ' + tag + '
+
+- 50 RE Plugins
+- C++ Disassembler
+- IDA MCP
+- 8 AI Platforms
+- AI Chat
+- Terminal',
+            });
+            return;
+          }
+
+          // Create release
+          const { data: release } = await github.rest.repos.createRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            tag_name: tag,
+            name: 'Hermes Analyzer ' + tag,
+            body: '## Hermes Analyzer ' + tag + '
+
+### Features
+- 50 Reverse Engineering Plugins
+- C++ Native Disassembler
+- IDA Pro MCP Server
+- 8 AI Platforms
+- AI Chat with Memory
+- Built-in Terminal',
+          });
+
+          console.log('Release created:', release.id);
+
+          // Upload APK asset
+          const apkName = path.basename(apkPath);
+          const apkData = fs.readFileSync(apkPath);
+
+          await github.rest.repos.uploadReleaseAsset({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            release_id: release.id,
+            name: apkName,
+            data: apkData,
+            headers: {
+              'content-type': 'application/vnd.android.package-archive',
+              'content-length': apkData.length
+            }
+          });
+
+          console.log('APK uploaded:', apkName, apkData.length, 'bytes');
