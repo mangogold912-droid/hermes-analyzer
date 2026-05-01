@@ -24,8 +24,13 @@ jobs:
       with:
         cmdline-tools-version: '12266719'
         packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+    - run: |
+        echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+        echo "Local properties:"
+        cat local.properties
     - run: chmod +x gradlew
     - run: ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+    - run: find app/build -name "*.apk"
     - uses: actions/upload-artifact@v4
       if: always()
       with:
