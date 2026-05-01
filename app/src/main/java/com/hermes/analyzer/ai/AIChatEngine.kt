@@ -335,7 +335,7 @@ class AIChatEngine(context: Context) {
             if (lowerMsg.contains(keyword)) {
                 for (plugin in plugins) {
                     try {
-                        val output = pluginEngine.executePlugin(plugin, "{}")
+                        val output = pluginEngine.executePlugin(plugin, mapOf("file" to "{}", "target" to "{}"))
                         results.add("[" + plugin + "]: " + output.take(500))
                     } catch (e: Exception) {
                         results.add("[" + plugin + "]: Error - " + e.message)
