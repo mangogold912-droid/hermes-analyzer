@@ -37,53 +37,27 @@ jobs:
         name: HermesAnalyzer-Debug
         path: app/build/outputs/apk/debug/
         if-no-files-found: warn
-    - name: Create Release
+    - name: Create Release with curl
       if: github.ref == 'refs/heads/main'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        cat > /tmp/release.py << 'EOF'
-        import os, urllib.request, json
-        token = os.environ['GITHUB_TOKEN']
-        repo = os.environ.get('GITHUB_REPOSITORY', '')
-        run_num = os.environ.get('GITHUB_RUN_NUMBER', '0')
-        tag = 'v' + run_num
+        APK=$(find app/build -name "*.apk" | head -1)
+        echo "APK: $APK"
+        ls -lh "$APK"
 
-        apk_path = None
-        for root, dirs, files in os.walk('app/build'):
-            for f in files:
-                if f.endswith('.apk'):
-                    apk_path = os.path.join(root, f)
-                    break
-            if apk_path:
-                break
+        TAG="v${GITHUB_RUN_NUMBER}"
+        echo "Tag: $TAG"
 
-        if not apk_path:
-            print("No APK found")
-            exit(1)
+        # Create release
+        RELEASE_JSON=$(curl -s -X POST           -H "Authorization: token $GITHUB_TOKEN"           -H "Content-Type: application/json"           -d "{"tag_name":"$TAG","name":"Hermes Analyzer $TAG","body":"Build $TAG"}"           "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases")
 
-        print(f"APK: {apk_path} ({os.path.getsize(apk_path)} bytes)")
+        RELEASE_ID=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
+        UPLOAD_URL=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")
 
-        req = urllib.request.Request(
-            f"https://api.github.com/repos/{repo}/releases",
-            data=json.dumps({"tag_name": tag, "name": f"Hermes Analyzer {tag}", "body": f"Build {tag}"}).encode(),
-            headers={"Authorization": f"token {token}", "Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req) as resp:
-            release = json.loads(resp.read().decode())
-            upload_url = release['upload_url'].replace('{?name,label}', '')
-            print(f"Release: {release['id']}")
+        echo "Release ID: $RELEASE_ID"
+        echo "Upload URL: $UPLOAD_URL"
 
-        apk_name = os.path.basename(apk_path)
-        with open(apk_path, 'rb') as f:
-            data = f.read()
-
-        req2 = urllib.request.Request(
-            f"{upload_url}?name={apk_name}",
-            data=data,
-            headers={"Authorization": f"token {token}", "Content-Type": "application/vnd.android.package-archive", "Content-Length": str(len(data))}
-        )
-        with urllib.request.urlopen(req2) as resp:
-            print(f"Uploaded: {json.loads(resp.read().decode())['browser_download_url']}")
-        EOF
-        python3 /tmp/release.py
+        # Upload APK
+        APK_NAME=$(basename "$APK")
+        curl -v -X POST           -H "Authorization: token $GITHUB_TOKEN"           -H "Content-Type: application/vnd.android.package-archive"           --data-binary "@$APK"           "${UPLOAD_URL}?name=${APK_NAME}"
