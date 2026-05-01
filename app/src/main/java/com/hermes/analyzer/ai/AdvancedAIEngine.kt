@@ -207,6 +207,11 @@ class AdvancedAIEngine(private val context: Context) {
 
     /**
      * Main autonomous analysis - the core AI agent
+     * 
+     * 1. Extract real file features (strings, headers)
+     * 2. Run built-in plugins for preliminary analysis
+     * 3. Call 8 AI platforms in parallel for deep analysis
+     * 4. Synthesize final report from AI results + plugin results
      */
     fun analyzeFileAutonomously(filePath: String, fileType: String, userGoal: String): String {
         val sb = StringBuilder()
@@ -217,82 +222,293 @@ class AdvancedAIEngine(private val context: Context) {
         sb.append("**File**: $filePath\n")
         sb.append("**Type**: $fileType\n\n")
 
-        // Step 1: Check for missing tools and download if needed
-        val plan = planner.createPlan(userGoal, filePath, fileType)
-        val allToolIds = plan.flatMap { it.toolIds }.distinct()
-        val missingTools = findMissingTools(allToolIds)
-
-        if (missingTools.isNotEmpty()) {
-            sb.append("### Tool Discovery\n")
-            sb.append("Missing tools detected: ${missingTools.joinToString()}\n\n")
-
-            for (tool in missingTools) {
-                sb.append("- Searching for '$tool'...\n")
-                val found = scope.async { discoverAndDownloadTool(tool) }
-                val result = runBlocking { found.await() }
-                sb.append("  $result\n")
-            }
-            sb.append("\n")
+        // === Step 1: Extract REAL file features ===
+        sb.append("### Phase 1: Local Feature Extraction\n\n")
+        val features = extractLocalFeatures(filePath, fileType)
+        features.forEach { (k, v) ->
+            val preview = v.toString().take(200)
+            sb.append("- **$k**: $preview${if (v.toString().length > 200) "..." else ""}\n")
         }
+        sb.append("\n")
 
-        // Step 2: Execute plan with orchestrator
-        sb.append("### Execution Plan\n\n")
-        sb.append(planner.planToMarkdown(plan))
-        sb.append("\n---\n\n")
-
-        val results = runBlocking {
-            orchestrator.executePlan(plan, filePath, object : ToolOrchestrator.ProgressCallback {
-                override fun onStepStarted(step: Int, description: String, toolIds: List<String>) {
-                    Log.i(TAG, "Step $step started: $description (${toolIds.size} tools)")
-                }
-                override fun onToolStarted(step: Int, toolId: String) {
-                    Log.i(TAG, "  Tool: $toolId")
-                }
-                override fun onToolCompleted(step: Int, toolId: String, success: Boolean) {
-                    Log.i(TAG, "  Tool: $toolId -> ${if (success) "OK" else "FAIL"}")
-                }
-                override fun onStepCompleted(step: Int, result: ToolOrchestrator.StepResult) {
-                    Log.i(TAG, "Step $step completed in ${result.durationMs}ms")
-                }
-                override fun onPlanCompleted(results: List<ToolOrchestrator.StepResult>, totalDurationMs: Long) {
-                    Log.i(TAG, "Plan completed in ${totalDurationMs}ms")
-                }
-                override fun onError(step: Int, error: String) {
-                    Log.e(TAG, "Step $step error: $error")
-                }
-            })
+        // === Step 2: Run plugin analysis (supplementary) ===
+        val pluginResults = runBlocking {
+            runLocalPlugins(filePath, fileType)
         }
-
-        // Step 3: Reflection - evaluate and supplement
-        val evaluation = reflection.evaluateOverall(results, userGoal)
-        if (!evaluation.goalAchieved && evaluation.suggestedTools.isNotEmpty()) {
-            sb.append("### Reflection: Additional Analysis Needed\n\n")
-            sb.append("${evaluation.reasoning}\n\n")
-
-            val supplementPlan = reflection.createSupplementaryPlan(evaluation, plan)
-            if (supplementPlan != null) {
-                sb.append("**Running supplementary tools**: ${evaluation.suggestedTools.joinToString()}\n\n")
-                val supplementResults = runBlocking {
-                    orchestrator.executePlan(supplementPlan, filePath)
-                }
-                results.plus(supplementResults)
+        if (pluginResults.isNotEmpty()) {
+            sb.append("### Phase 2: Plugin Scan Results\n\n")
+            pluginResults.forEach { (name, output) ->
+                sb.append("**$name**: ${output.take(300)}${if (output.length > 300) "..." else ""}\n\n")
             }
         }
 
-        // Step 4: Generate final report
-        val report = orchestrator.synthesizeReport(results)
-        sb.append(report)
+        // === Step 3: 8 AI PARALLEL ANALYSIS (core) ===
+        sb.append("### Phase 3: 8 AI Parallel Deep Analysis\n\n")
+        val activePlatforms = getActivePlatforms()
+        if (activePlatforms.isEmpty()) {
+            sb.append("*No AI API keys configured. Showing local analysis only.*\n\n")
+            sb.append("To enable AI analysis, add API keys in Settings (wrench icon).\n")
+        } else {
+            // Build analysis prompt with real file data
+            val analysisPrompt = buildAnalysisPrompt(filePath, fileType, userGoal, features, pluginResults)
 
-        // Step 5: Save to memory for learning
+            val aiResult = runBlocking {
+                try {
+                    chatWithParallelAI(analysisPrompt, filePath)
+                } catch (e: Exception) {
+                    "**AI Analysis Error**: ${e.message}\n\nPlease check your API keys and network connection."
+                }
+            }
+            sb.append(aiResult)
+        }
+
+        // === Step 4: Save to memory for learning ===
         val duration = System.currentTimeMillis() - startTime
-        saveToMemory(userGoal, filePath, fileType, results, duration, evaluation.confidence)
+        saveToMemorySimple(userGoal, filePath, fileType, duration, activePlatforms.isNotEmpty())
 
         sb.append("\n---\n\n")
         sb.append("**Analysis completed in ${duration / 1000}s**\n")
-        sb.append("**Tools used**: ${results.sumOf { it.toolResults.size }}\n")
-        sb.append("**Confidence**: ${(evaluation.confidence * 100).toInt()}%\n")
+        sb.append("**Local plugins**: ${pluginResults.size}\n")
+        sb.append("**AI platforms**: ${activePlatforms.size}/8 active\n")
 
         return sb.toString()
+    }
+
+    /**
+     * Extract REAL local features from the binary file
+     */
+    private fun extractLocalFeatures(filePath: String, fileType: String): Map<String, String> {
+        val features = mutableMapOf<String, String>()
+        val file = File(filePath)
+        if (!file.exists()) return features
+
+        try {
+            // Basic file info
+            features["size"] = formatFileSize(file.length())
+            features["md5"] = computeMD5(file)
+
+            // Read first bytes for magic signature
+            file.inputStream().use { fis ->
+                val magic = ByteArray(16)
+                val read = fis.read(magic)
+                if (read > 0) {
+                    features["magic_hex"] = magic.take(read).joinToString(" ") { "%02X".format(it) }
+                    features["magic_ascii"] = magic.take(read).map { 
+                        if (it in 32..126) it.toChar() else '.' 
+                    }.joinToString("")
+                }
+            }
+
+            // File-type specific extraction
+            when (fileType.lowercase()) {
+                "apk", "zip", "jar" -> {
+                    features["is_zip"] = "true"
+                    // List zip entries
+                    try {
+                        val entries = mutableListOf<String>()
+                        java.util.zip.ZipFile(file).use { zip ->
+                            entries.addAll(zip.entries().toList().map { it.name }.take(50))
+                        }
+                        features["zip_entries_count"] = entries.size.toString()
+                        features["zip_entries_sample"] = entries.take(20).joinToString("\n")
+                        // Look for DEX
+                        features["has_dex"] = entries.any { it.endsWith(".dex") }.toString()
+                        features["has_so"] = entries.any { it.endsWith(".so") }.toString()
+                        features["has_android_manifest"] = entries.any { 
+                            it.equals("AndroidManifest.xml", ignoreCase = true) 
+                        }.toString()
+                    } catch (_: Exception) {}
+                }
+                "elf", "so", "o" -> {
+                    features["is_elf"] = "true"
+                    // ELF magic: 7F 45 4C 46
+                    file.inputStream().use { fis ->
+                        val header = ByteArray(64)
+                        val read = fis.read(header)
+                        if (read >= 20) {
+                            val elfClass = when (header[4]) {
+                                1.toByte() -> "32-bit"
+                                2.toByte() -> "64-bit"
+                                else -> "unknown"
+                            }
+                            val endian = when (header[5]) {
+                                1.toByte() -> "Little Endian"
+                                2.toByte() -> "Big Endian"
+                                else -> "unknown"
+                            }
+                            val osAbi = when (header[7]) {
+                                0.toByte() -> "System V"
+                                3.toByte() -> "Linux"
+                                else -> "other"
+                            }
+                            features["elf_class"] = elfClass
+                            features["elf_endian"] = endian
+                            features["elf_osabi"] = osAbi
+                        }
+                    }
+                }
+                "dex" -> {
+                    features["is_dex"] = "true"
+                    file.inputStream().use { fis ->
+                        val header = ByteArray(112)
+                        val read = fis.read(header)
+                        if (read >= 8) {
+                            val magicStr = header.take(8).map { 
+                                if (it in 32..126) it.toChar() else '.' 
+                            }.joinToString("")
+                            features["dex_magic"] = magicStr
+                        }
+                    }
+                }
+            }
+
+            // Extract strings (first 1000 printable strings)
+            val strings = extractStrings(file, 1000)
+            features["strings_count"] = strings.size.toString()
+            features["strings_sample"] = strings.take(30).joinToString("\n")
+            // Interesting strings
+            val urls = strings.filter { it.startsWith("http://") || it.startsWith("https://") }
+            val ips = strings.filter { Regex("\\d+\\.\\d+\\.\\d+\\.\\d+").containsMatchIn(it) }
+            val crypto = strings.filter { 
+                it.contains("AES") || it.contains("RSA") || it.contains("SHA") || 
+                it.contains("encrypt", true) || it.contains("decrypt", true) ||
+                it.contains("cipher", true) || it.contains("base64", true)
+            }
+            if (urls.isNotEmpty()) features["urls"] = urls.take(10).joinToString("\n")
+            if (ips.isNotEmpty()) features["ips"] = ips.take(10).joinToString("\n")
+            if (crypto.isNotEmpty()) features["crypto_refs"] = crypto.take(10).joinToString("\n")
+
+        } catch (e: Exception) {
+            Log.w(TAG, "Feature extraction failed: ${e.message}")
+            features["error"] = e.message ?: "unknown"
+        }
+
+        return features
+    }
+
+    private fun computeMD5(file: File): String {
+        return try {
+            val digest = java.security.MessageDigest.getInstance("MD5")
+            file.inputStream().use { fis ->
+                val buffer = ByteArray(8192)
+                var read: Int
+                while (fis.read(buffer).also { read = it } > 0) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (_: Exception) { "unknown" }
+    }
+
+    private fun extractStrings(file: File, maxCount: Int): List<String> {
+        val strings = mutableListOf<String>()
+        try {
+            file.inputStream().use { fis ->
+                val buffer = ByteArray(8192)
+                val current = StringBuilder()
+                var read: Int
+                while (fis.read(buffer).also { read = it } > 0 && strings.size < maxCount) {
+                    for (i in 0 until read) {
+                        val b = buffer[i]
+                        if (b in 32..126) {
+                            current.append(b.toChar())
+                        } else {
+                            if (current.length >= 4) {
+                                strings.add(current.toString())
+                            }
+                            current.clear()
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return strings
+    }
+
+    /**
+     * Run a subset of local plugins for supplementary data
+     */
+    private suspend fun runLocalPlugins(filePath: String, fileType: String): Map<String, String> {
+        val results = mutableMapOf<String, String>()
+        val pluginsToRun = listOf("radare2_wrapper", "string_extractor", "crypto_hunter", "network_analyzer")
+
+        for (pluginId in pluginsToRun) {
+            try {
+                val params = mapOf("file" to filePath, "target" to filePath)
+                val output = withContext(Dispatchers.IO) {
+                    pluginEngine.executePlugin(pluginId, params)
+                }
+                if (!output.startsWith("Error")) {
+                    results[pluginId] = output
+                }
+            } catch (_: Exception) {}
+        }
+        return results
+    }
+
+    /**
+     * Build analysis prompt for AI with real file data
+     */
+    private fun buildAnalysisPrompt(
+        filePath: String, fileType: String, userGoal: String,
+        features: Map<String, String>, pluginResults: Map<String, String>
+    ): String {
+        val sb = StringBuilder()
+        sb.append("You are an expert reverse engineering AI. Analyze this binary file thoroughly.\n\n")
+        sb.append("USER GOAL: $userGoal\n")
+        sb.append("FILE TYPE: $fileType\n")
+        sb.append("FILE PATH: $filePath\n\n")
+
+        // Real extracted features
+        sb.append("=== EXTRACTED FILE FEATURES ===\n")
+        features.forEach { (k, v) ->
+            sb.append("$k: $v\n")
+        }
+        sb.append("\n")
+
+        // Plugin results
+        if (pluginResults.isNotEmpty()) {
+            sb.append("=== LOCAL PLUGIN SCAN RESULTS ===\n")
+            pluginResults.forEach { (name, output) ->
+                sb.append("--- $name ---\n$output\n\n")
+            }
+        }
+
+        sb.append("Provide a comprehensive analysis including:\n")
+        sb.append("1. File type and structure identification\n")
+        sb.append("2. Security analysis - potential vulnerabilities, suspicious behavior\n")
+        sb.append("3. Network communication indicators (URLs, IPs, API endpoints)\n")
+        sb.append("4. Cryptographic usage analysis\n")
+        sb.append("5. Reverse engineering insights - what this binary likely does\n")
+        sb.append("6. Risk assessment and recommendations\n")
+        sb.append("7. If APK: component analysis (activities, services, receivers)\n")
+        sb.append("\nRespond in a well-structured markdown format.")
+
+        return sb.toString()
+    }
+
+    /**
+     * Simplified memory save for agent analysis
+     */
+    private fun saveToMemorySimple(
+        goal: String, filePath: String, fileType: String,
+        duration: Long, aiUsed: Boolean
+    ) {
+        try {
+            val entry = JSONObject().apply {
+                put("timestamp", System.currentTimeMillis())
+                put("goal", goal)
+                put("fileType", fileType)
+                put("duration", duration)
+                put("aiUsed", aiUsed)
+                put("success", true)
+            }
+            val memory = getMemoryJson()
+            memory.put(entry)
+            memoryPrefs.edit().putString("analysis_memory", memory.toString()).apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Memory save failed: ${e.message}")
+        }
     }
 
     // ==================== 4. TOOL DISCOVERY & DOWNLOAD ====================
