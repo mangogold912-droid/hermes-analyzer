@@ -894,4 +894,4 @@ object BinaryAnalyzer {
         md.update(bytes)
         return md.digest().joinToString("") { "%02x".format(it) }
     }
-
+}
