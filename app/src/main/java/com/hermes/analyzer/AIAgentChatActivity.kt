@@ -276,103 +276,67 @@ class AIAgentChatActivity : AppCompatActivity() {
      */
     private suspend fun generateSelfAiResponse(message: String): String {
         val sb = StringBuilder()
-        sb.append("## 자체 고급 AI 응답 (Self-AI Mode)")
-        sb.append("
+        sb.append("## 자체 고급 AI 응답 (Self-AI Mode)\n\n")
+        sb.append("*Running internal reinforcement-learning + cognitive engine...*\n\n")
 
-*Running internal reinforcement-learning + cognitive engine...*
-
-")
-        
-        // Phase 1: Intent inference
         val filePath = findRecentFile()
         val fileType = filePath?.let { engine.getFileType(it) } ?: "unknown"
         val userIntent = engine.inferIntent(message, fileType)
-        
-        sb.append("### 인지 분석 (Cognitive Analysis)
-")
-        sb.append("- **감지된 의도**: ${userIntent.primaryType} (신뢰도: ${"%.0f".format(userIntent.confidence * 100)}%)
-")
-        sb.append("- **긴급도**: ${userIntent.urgency}/5
-")
-        if (userIntent.entities.isNotEmpty()) {
-            sb.append("- **감지된 도구**: ${userIntent.entities.joinToString()}
-")
-        }
-        sb.append("- **권장 접근법**: ${userIntent.suggestedApproach}
 
-")
-        
-        // Phase 2: Hierarchical reasoning
+        sb.append("### 인지 분석 (Cognitive Analysis)\n")
+        sb.append("- **감지된 의도**: ${userIntent.primaryType} (신뢰도: ${"%.0f".format(userIntent.confidence * 100)}%)\n")
+        sb.append("- **긴급도**: ${userIntent.urgency}/5\n")
+        if (userIntent.entities.isNotEmpty()) {
+            sb.append("- **감지된 도구**: ${userIntent.entities.joinToString()}\n")
+        }
+        sb.append("- **권장 접근법**: ${userIntent.suggestedApproach}\n\n")
+
         val reasoningTree = engine.decomposeGoal(message, fileType)
-        sb.append("### 계층적 추론 (Hierarchical Reasoning)
-")
-        sb.append("복잡도: ${reasoningTree.root.complexity}/5 | 예상 단계: ${reasoningTree.estimatedSteps}
-")
+        sb.append("### 계층적 추론 (Hierarchical Reasoning)\n")
+        sb.append("복잡도: ${reasoningTree.root.complexity}/5 | 예상 단계: ${reasoningTree.estimatedSteps}\n")
         reasoningTree.root.subGoals.forEach { phase ->
-            sb.append("
-**${phase.description}**
-")
+            sb.append("\n**${phase.description}**\n")
             phase.subGoals.forEach { step ->
-                sb.append("  - ${step.description} (난이도: ${step.complexity})
-")
+                sb.append("  - ${step.description} (난이도: ${step.complexity})\n")
             }
         }
-        sb.append("
-")
-        
-        // Phase 3: Actual analysis
-        if (filePath != null && java.io.File(filePath).exists()) {
-            sb.append("### 실제 파일 분석 실행
+        sb.append("\n")
 
-")
+        if (filePath != null && java.io.File(filePath).exists()) {
+            sb.append("### 실제 파일 분석 실행\n\n")
             val localResult = engine.analyzeFileAutonomously(filePath, fileType, message)
             sb.append(localResult)
         } else {
-            sb.append("### 지식 기반 응답
-
-")
+            sb.append("### 지식 기반 응답\n\n")
             val knowledge = engine.queryKnowledge(message.take(20))
             if (knowledge.isNotEmpty()) {
-                sb.append("관련 지식:
-")
+                sb.append("관련 지식:\n")
                 knowledge.take(3).forEach { k ->
-                    sb.append("- ${k.key}: ${k.value.take(100)}... (신뢰도: ${"%.0f".format(k.confidence * 100)}%)
-")
+                    sb.append("- ${k.key}: ${k.value.take(100)}... (신뢰도: ${"%.0f".format(k.confidence * 100)}%)\n")
                 }
-                sb.append("
-")
+                sb.append("\n")
             }
             sb.append(engine.generateRuleBasedFallback(message, null))
         }
-        
-        // Phase 4: Meta-cognition
-        sb.append("
-### 메타 인지 (Meta-Cognition)
-")
+
+        sb.append("\n### 메타 인지 (Meta-Cognition)\n")
         val reflection = engine.selfReflect(sb.toString(), 5000)
-        sb.append("- **자체 평가 점수**: ${"%.0f".format(reflection.selfScore * 100)}/100
-")
+        sb.append("- **자체 평가 점수**: ${"%.0f".format(reflection.selfScore * 100)}/100\n")
         if (reflection.issues.isNotEmpty()) {
-            sb.append("- **개선 필요사항**:
-")
-            reflection.issues.take(2).forEach { sb.append("  - $it
-") }
+            sb.append("- **개선 필요사항**:\n")
+            reflection.issues.take(2).forEach { sb.append("  - $it\n") }
         }
         if (reflection.improvements.isNotEmpty()) {
-            sb.append("- **제안된 개선**:
-")
-            reflection.improvements.take(2).forEach { sb.append("  - $it
-") }
+            sb.append("- **제안된 개선**:\n")
+            reflection.improvements.take(2).forEach { sb.append("  - $it\n") }
         }
-        
-        // Phase 5: RL report
-        sb.append("
-### 강화학습 상태 (Reinforcement Learning)
-")
+
+        sb.append("\n### 강화학습 상태 (Reinforcement Learning)\n")
         sb.append(engine.getStrategyReport())
-        
+
         return sb.toString()
     }
+
     private fun handleApiKeyCommand(message: String): String {
         val parts = message.split(" ", limit = 3)
         if (parts.size >= 3 && parts[1] == "set") {
