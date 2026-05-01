@@ -24,30 +24,45 @@ jobs:
       with:
         cmdline-tools-version: '12266719'
         packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
-    - name: Debug SDK
-      run: |
-        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-        echo "ANDROID_HOME=$ANDROID_HOME"
-        ls -la $ANDROID_SDK_ROOT/ 2>/dev/null || echo "SDK root not found"
-        ls -la $ANDROID_SDK_ROOT/platforms/ 2>/dev/null || echo "No platforms"
-        ls -la $ANDROID_SDK_ROOT/build-tools/ 2>/dev/null || echo "No build-tools"
-    - name: Create local.properties
-      run: |
+    - run: |
         echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-        cat local.properties
     - run: chmod +x gradlew
     - name: Build APK
-      run: ./gradlew assembleDebug --info --stacktrace --no-daemon 2>&1 | tee build.log
+      run: |
+        set -o pipefail
+        ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
     - name: Check APK
       run: |
-        echo "=== APK files ==="
-        find app/build -name "*.apk" 2>/dev/null || echo "No APK files"
-        echo "=== All outputs ==="
-        ls -laR app/build/outputs/ 2>/dev/null || echo "No outputs dir"
-        echo "=== Build dir ==="
-        ls -la app/build/ 2>/dev/null || echo "No build dir"
+        echo "=== APK Search ==="
+        find app/build -name "*.apk" -ls
     - uses: actions/upload-artifact@v4
       if: always()
       with:
         name: build-log
         path: build.log
+    - uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: HermesAnalyzer-Debug
+        path: app/build/outputs/apk/debug/
+        if-no-files-found: warn
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' && success()
+      uses: softprops/action-gh-release@v2
+      with:
+        files: app/build/outputs/apk/debug/*.apk
+        tag_name: v${{ github.run_number }}
+        name: Hermes Analyzer v${{ github.run_number }}
+        body: |
+          ## Hermes Analyzer v${{ github.run_number }}
+
+          ### Features
+          - 50 Reverse Engineering Plugins
+          - C++ Native Disassembler
+          - IDA Pro MCP Server
+          - 8 AI Platforms
+          - AI Chat with Memory
+          - Built-in Terminal
+          - All files access
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
