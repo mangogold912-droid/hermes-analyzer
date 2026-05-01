@@ -286,11 +286,8 @@ class AdvancedAIEngine(private val context: Context) {
         cognitive.addToWorkingMemory("Analyzed $fileType: ${intent.primaryType} intent (confidence: ${intent.confidence})", AdvancedCognitiveEngine.MemoryType.OUTCOME, listOf("analysis", fileType))
         val reflection = cognitive.selfReflect(sb.toString(), duration)
         if (reflection.issues.isNotEmpty()) {
-            sb.append("
-### Self-Improvement Notes
-")
-            reflection.issues.take(3).forEach { sb.append("- $it
-") }
+            sb.append("\n### Self-Improvement Notes\n")
+            reflection.issues.take(3).forEach { sb.append("- $it\n") }
         }
 
         return sb.toString()
