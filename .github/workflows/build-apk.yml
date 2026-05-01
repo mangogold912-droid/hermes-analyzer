@@ -30,7 +30,7 @@ jobs:
     - name: Build APK
       run: |
         set -o pipefail
-        ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
+        ./gradlew clean assembleDebug --stacktrace --no-daemon 2>&1 | tee build.log
     - name: Check APK
       run: |
         echo "=== APK Search ==="
