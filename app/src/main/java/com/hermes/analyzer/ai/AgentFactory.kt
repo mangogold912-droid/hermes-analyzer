@@ -132,7 +132,7 @@ class AgentFactory(private val context: Context) {
         }
 
         agentCounter++
-        val id = "agent_temp_${agentCounter}_${System.currentTimeMillis()}"
+        var id = "agent_temp_${agentCounter}_${System.currentTimeMillis()}"
         val agent = DynamicAgent(id, role, "idle", System.currentTimeMillis())
         agent.taskDescription = task
         dynamicAgents[id] = agent
@@ -213,7 +213,7 @@ Total Ever Spawned: $agentCounter
         repeat(count) {
             if (dynamicAgents.size >= maxDynamicAgents) return
             agentCounter++
-            val id = "agent_dyn_${agentCounter}_${System.currentTimeMillis()}"
+            var id = "agent_dyn_${agentCounter}_${System.currentTimeMillis()}"
             val role = when (roleHint) {
                 "code" -> "code_analyzer"
                 "security" -> "security_scanner"
