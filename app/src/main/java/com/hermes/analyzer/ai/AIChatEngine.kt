@@ -1,6 +1,7 @@
 package com.hermes.analyzer.ai
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
@@ -14,15 +15,46 @@ import java.util.Locale
  * - SQLite conversation history storage
  * - Context window management (recent N messages)
  * - Plugin integration (AI automatically executes plugins)
+ * - 8 AI Platform API key management (SharedPreferences)
  */
 class AIChatEngine(context: Context) {
 
     private val db: ChatDatabase = ChatDatabase(context)
     private val pluginEngine: PluginEngine = PluginEngine(context)
+    private val apiKeyManager: ApiKeyManager = ApiKeyManager(context)
 
     companion object {
         private const val TAG = "AIChatEngine"
         private const val MAX_CONTEXT = 20
+
+        // 8 AI Platform constants
+        const val AI_OPENAI = "openai"
+        const val AI_KIMI = "kimi"
+        const val AI_QWEN = "qwen"
+        const val AI_GEMINI = "gemini"
+        const val AI_CLAUDE = "claude"
+        const val AI_DEEPSEEK = "deepseek"
+        const val AI_OLLAMA = "ollama"
+        const val AI_SUPRNINJA = "suprninja"
+
+        val ALL_AI_PLATFORMS = listOf(
+            AI_OPENAI, AI_KIMI, AI_QWEN, AI_GEMINI,
+            AI_CLAUDE, AI_DEEPSEEK, AI_OLLAMA, AI_SUPRNINJA
+        )
+
+        fun getPlatformDisplayName(platform: String): String {
+            return when (platform) {
+                AI_OPENAI -> "OpenAI (GPT-4)"
+                AI_KIMI -> "Kimi (Moonshot)"
+                AI_QWEN -> "Qwen (Alibaba)"
+                AI_GEMINI -> "Gemini (Google)"
+                AI_CLAUDE -> "Claude (Anthropic)"
+                AI_DEEPSEEK -> "DeepSeek"
+                AI_OLLAMA -> "Ollama (Local)"
+                AI_SUPRNINJA -> "Suprninja"
+                else -> platform
+            }
+        }
     }
 
     data class ChatMessage(
@@ -32,6 +64,138 @@ class AIChatEngine(context: Context) {
         val timestamp: Long = System.currentTimeMillis(),
         val pluginUsed: String? = null
     )
+
+    // ============================================================
+    // API KEY MANAGEMENT
+    // ============================================================
+
+    /**
+     * ApiKeyManager - 8 AI Platform API key storage via SharedPreferences
+     */
+    class ApiKeyManager(context: Context) {
+        private val prefs: SharedPreferences = context.getSharedPreferences(
+            "hermes_api_keys", Context.MODE_PRIVATE
+        )
+
+        /**
+         * Save API key for a platform
+         */
+        fun saveApiKey(platform: String, apiKey: String): Boolean {
+            if (apiKey.isBlank()) return false
+            prefs.edit().putString(platform, apiKey.trim()).apply()
+            Log.i(TAG, "API key saved for: $platform")
+            return true
+        }
+
+        /**
+         * Get API key for a platform
+         */
+        fun getApiKey(platform: String): String? {
+            val key = prefs.getString(platform, null)
+            return if (key.isNullOrBlank()) null else key
+        }
+
+        /**
+         * Check if API key exists for a platform
+         */
+        fun hasApiKey(platform: String): Boolean {
+            return !prefs.getString(platform, null).isNullOrBlank()
+        }
+
+        /**
+         * Delete API key for a platform
+         */
+        fun deleteApiKey(platform: String) {
+            prefs.edit().remove(platform).apply()
+            Log.i(TAG, "API key deleted for: $platform")
+        }
+
+        /**
+         * Get all saved API keys (platform -> key map)
+         */
+        fun getAllSavedKeys(): Map<String, String> {
+            val map = mutableMapOf<String, String>()
+            for (platform in ALL_AI_PLATFORMS) {
+                val key = prefs.getString(platform, null)
+                if (!key.isNullOrBlank()) {
+                    map[platform] = key
+                }
+            }
+            return map
+        }
+
+        /**
+         * Get platforms that have API keys configured
+         */
+        fun getActivePlatforms(): List<String> {
+            return ALL_AI_PLATFORMS.filter { hasApiKey(it) }
+        }
+
+        /**
+         * Save all 8 API keys at once
+         */
+        fun saveAllApiKeys(keys: Map<String, String>): Int {
+            var saved = 0
+            val editor = prefs.edit()
+            for ((platform, key) in keys) {
+                if (platform in ALL_AI_PLATFORMS && key.isNotBlank()) {
+                    editor.putString(platform, key.trim())
+                    saved++
+                }
+            }
+            editor.apply()
+            Log.i(TAG, "Saved $saved API keys")
+            return saved
+        }
+
+        /**
+         * Clear all API keys
+         */
+        fun clearAllKeys() {
+            prefs.edit().clear().apply()
+            Log.i(TAG, "All API keys cleared")
+        }
+    }
+
+    // ============================================================
+    // PUBLIC API KEY METHODS
+    // ============================================================
+
+    fun saveApiKey(platform: String, apiKey: String): Boolean {
+        return apiKeyManager.saveApiKey(platform, apiKey)
+    }
+
+    fun getApiKey(platform: String): String? {
+        return apiKeyManager.getApiKey(platform)
+    }
+
+    fun hasApiKey(platform: String): Boolean {
+        return apiKeyManager.hasApiKey(platform)
+    }
+
+    fun deleteApiKey(platform: String) {
+        apiKeyManager.deleteApiKey(platform)
+    }
+
+    fun getAllSavedApiKeys(): Map<String, String> {
+        return apiKeyManager.getAllSavedKeys()
+    }
+
+    fun getActiveAiPlatforms(): List<String> {
+        return apiKeyManager.getActivePlatforms()
+    }
+
+    fun saveAllApiKeys(keys: Map<String, String>): Int {
+        return apiKeyManager.saveAllApiKeys(keys)
+    }
+
+    fun clearAllApiKeys() {
+        apiKeyManager.clearAllKeys()
+    }
+
+    // ============================================================
+    // CHAT MESSAGING
+    // ============================================================
 
     /**
      * Send message + generate AI response
@@ -49,49 +213,47 @@ class AIChatEngine(context: Context) {
     /**
      * Keyword analysis -> plugin auto-execution
      */
-    private fun autoExecutePlugins(userMessage: String): List<String> {
-        val lower = userMessage.lowercase()
+    private fun autoExecutePlugins(msg: String): List<String> {
         val results = mutableListOf<String>()
-        val executed = mutableSetOf<String>()
+        val lowerMsg = msg.lowercase(Locale.getDefault())
 
         val keywordMap = mapOf(
-            // ==== EXISTING KEYWORDS (keep all) ====
-            "elf" to listOf("elf_analyzer"),
-            "dex" to listOf("dex_decompiler"),
-            "apk" to listOf("apk_deep_scan", "dex_decompiler"),
-            "string" to listOf("string_extractor"),
-            "ida" to listOf("ida_mcp_bridge"),
+            "elf" to listOf("elf_analyzer", "capstone_disasm"),
+            "dex" to listOf("dex_decompiler", "jadx_decompiler"),
+            "apk" to listOf("deep_scan_apk", "apktool_engine", "mobsf_scanner"),
+            "string" to listOf("string_extractor", "capa_floss"),
+            "ida" to listOf("ida_mcp_bridge", "ida_objc_types"),
             "radare" to listOf("radare2_wrapper"),
             "r2" to listOf("radare2_wrapper"),
             "yara" to listOf("yara_scanner"),
-            "malware" to listOf("yara_scanner", "vuln_scanner"),
-            "crypto" to listOf("crypto_hunter"),
+            "malware" to listOf("yara_scanner", "quark_engine", "mobsf_scanner"),
+            "crypto" to listOf("crypto_hunter", "capa_floss"),
             "aes" to listOf("crypto_hunter"),
-            "network" to listOf("network_analyzer"),
+            "rsa" to listOf("crypto_hunter"),
+            "network" to listOf("network_analyzer", "wireshark_analyzer"),
             "url" to listOf("network_analyzer"),
-            "vuln" to listOf("vuln_scanner"),
-            "exploit" to listOf("vuln_scanner"),
+            "vuln" to listOf("vuln_scanner", "mobsf_scanner"),
+            "exploit" to listOf("vuln_scanner", "coruna_ios"),
             "jni" to listOf("jni_analyzer"),
-            "native" to listOf("jni_analyzer"),
+            "native" to listOf("jni_analyzer", "capstone_disasm"),
             "frida" to listOf("frida_generator"),
-            "hook" to listOf("frida_generator"),
-            "disassembl" to listOf("capstone_disasm"),
+            "hook" to listOf("frida_generator", "objection_tool"),
+            "disassembl" to listOf("capstone_disasm", "binary_ninja"),
             "arm" to listOf("capstone_disasm"),
             "x86" to listOf("capstone_disasm"),
-            "binary" to listOf("elf_analyzer", "string_extractor"),
-            "reverse" to listOf("radare2_wrapper", "capstone_disasm"),
-            "decompil" to listOf("dex_decompiler", "ida_mcp_bridge"),
-            "scan" to listOf("yara_scanner", "vuln_scanner", "apk_deep_scan"),
-            "analyze" to listOf("elf_analyzer", "string_extractor", "network_analyzer"),
-            "root" to listOf("apk_deep_scan", "jni_analyzer"),
-            "obfusc" to listOf("dex_decompiler", "string_extractor"),
+            "binary" to listOf("elf_analyzer", "binary_ninja"),
+            "reverse" to listOf("ida_mcp_bridge", "radare2_wrapper", "capstone_disasm"),
+            "decompil" to listOf("jadx_decompiler", "dex_decompiler", "dnspy_decompiler"),
+            "scan" to listOf("yara_scanner", "vuln_scanner", "quark_engine"),
+            "analyze" to listOf("elf_analyzer", "network_analyzer"),
+            "root" to listOf("coruna_ios"),
+            "obfusc" to listOf("detect_it_easy"),
             "protocol" to listOf("network_analyzer"),
-            "api" to listOf("network_analyzer", "frida_generator"),
-            "permission" to listOf("apk_deep_scan"),
-
-            // ==== 30 NEW KEYWORD MAPPINGS ====
+            "api" to listOf("network_analyzer", "objection_tool"),
+            "permission" to listOf("apktool_engine"),
+            // 30 Discord RE tools keywords
             "binary ninja" to listOf("binary_ninja"),
-            "ghidra" to listOf("ghidra_analyzer"),
+            "ghidra" to listOf("ghidra_analyzer", "ghidra_fox"),
             "cutter" to listOf("cutter_rizin"),
             "rizin" to listOf("cutter_rizin"),
             "jadx" to listOf("jadx_decompiler"),
@@ -141,8 +303,7 @@ class AIChatEngine(context: Context) {
             "web" to listOf("burp_zap_proxy"),
             "packet" to listOf("wireshark_analyzer"),
             "traffic" to listOf("wireshark_analyzer"),
-
-            // ==== 7 ADDITIONAL KEYWORD MAPPINGS ====
+            // 7 additional Discord tools
             "fox" to listOf("ghidra_fox"),
             "federicodotta" to listOf("ghidra_fox"),
             "objc" to listOf("ida_objc_types"),
@@ -170,238 +331,183 @@ class AIChatEngine(context: Context) {
             "exploit kit" to listOf("coruna_ios")
         )
 
-        for ((keyword, pluginIds) in keywordMap) {
-            if (lower.contains(keyword)) {
-                for (pluginId in pluginIds) {
-                    if (pluginId !in executed) {
-                        executed.add(pluginId)
-                        val result = pluginEngine.executePlugin(pluginId, mapOf("file" to "auto", "query" to userMessage))
-                        results.add("[" + pluginId + "] " + result)
-                        Log.i(TAG, "Auto-executed plugin: " + pluginId)
+        for ((keyword, plugins) in keywordMap) {
+            if (lowerMsg.contains(keyword)) {
+                for (plugin in plugins) {
+                    try {
+                        val output = pluginEngine.executePlugin(plugin, "{}")
+                        results.add("[" + plugin + "]: " + output.take(500))
+                    } catch (e: Exception) {
+                        results.add("[" + plugin + "]: Error - " + e.message)
                     }
                 }
             }
         }
-
         return results
     }
 
     /**
      * AI response generation
      */
-    private fun generateResponse(
-        userMessage: String,
-        context: List<ChatMessage>,
-        pluginResults: List<String>
-    ): String {
+    private fun generateResponse(userMsg: String, context: List<ChatMessage>, pluginResults: List<String>): String {
         val sb = StringBuilder()
 
-        // Show plugin execution results first if present
         if (pluginResults.isNotEmpty()) {
-            sb.append("**Analysis Results:**\n\n")
-            for (result in pluginResults) {
-                sb.append("```\n").append(result).append("\n```\n\n")
+            sb.append("**Auto-executed plugins:**\n\n")
+            for (r in pluginResults) {
+                sb.append("- ").append(r).append("\n")
             }
+            sb.append("\n---\n\n")
         }
 
-        // Context-based response
-        val lower = userMessage.lowercase()
-
-        // Greeting
-        if (lower.contains("hello") || lower.contains("hi ") || lower.contains("hey")) {
-            sb.append("Hello! I'm **Hermes AI**, your advanced reverse engineering assistant. I can:\n\n")
-            sb.append("- Analyze binaries (ELF, PE, DEX, APK)\n")
-            sb.append("- Decompile and disassemble code\n")
-            sb.append("- Find vulnerabilities and crypto\n")
-            sb.append("- Generate Frida scripts\n")
-            sb.append("- Scan with YARA rules\n")
-            sb.append("- And much more...\n\n")
-            sb.append("Just tell me what file you want to analyze or what you need help with!")
-            return sb.toString()
-        }
-
-        // File analysis request
-        if (lower.contains("analyze") || lower.contains("file") || lower.contains("binary")) {
-            sb.append("I'll analyze the target file systematically. Here's my approach:\n\n")
-            sb.append("1. **File Type Detection** - Identify format (ELF/PE/DEX/APK)\n")
-            sb.append("2. **String Analysis** - Extract interesting strings\n")
-            sb.append("3. **Structure Analysis** - Parse headers and sections\n")
-            sb.append("4. **Security Scan** - Check for vulnerabilities\n")
-            sb.append("5. **Report Generation** - Summarize findings\n\n")
-            if (pluginResults.isNotEmpty()) {
-                sb.append("I've already run the initial analysis above. Would you like me to go deeper into any specific area?")
-            } else {
-                sb.append("Please provide the file path or select a file to begin analysis.")
-            }
-            return sb.toString()
-        }
-
-        // Help request
-        if (lower.contains("help") || lower.contains("what can you do")) {
-            sb.append("## Available Capabilities\n\n")
-
-            // Binary Analysis (13 plugins)
-            sb.append("**Binary Analysis (13):**\n")
-            sb.append("- ELF Analyzer: Headers, sections, symbols, relocations\n")
-            sb.append("- Capstone Disasm: ARM/x86 disassembly engine\n")
-            sb.append("- Binary Ninja: Advanced binary analysis platform\n")
-            sb.append("- Ghidra Analyzer: NSA reverse engineering suite\n")
-            sb.append("- Ghidra Fox: iOS/macOS Ghidra scripts (Federico Dotta)\n")
-            sb.append("- Cutter/Rizin: Open-source reverse engineering GUI\n")
-            sb.append("- dnSpy Decompiler: .NET assembly decompiler\n")
-            sb.append("- Detect It Easy: Packer/compiler identifier\n")
-            sb.append("- PE Bear: Portable Executable file analyzer\n")
-            sb.append("- BinDiff Compare: Binary diffing and comparison\n")
-            sb.append("- ImHex Editor: Hex pattern visualization editor\n")
-            sb.append("- IDA MCP Bridge: IDA Pro integration bridge\n")
-            sb.append("- Radare2 Wrapper: Command-line reverse framework\n\n")
-
-            // Security (6 plugins)
-            sb.append("**Security (6):**\n")
-            sb.append("- YARA Scanner: Malware pattern detection\n")
-            sb.append("- Vuln Scanner: CVE, overflow, injection checks\n")
-            sb.append("- Crypto Hunter: Find AES, RSA, hash algorithms\n")
-            sb.append("- CAPA/FLOSS: Capability extraction and string deobfuscation\n")
-            sb.append("- Quark Engine: Android malware scoring\n")
-            sb.append("- Coruna iOS: iOS exploitation and jailbreak toolkit\n\n")
-
-            // Mobile / Android (11 plugins)
-            sb.append("**Mobile / Android (11):**\n")
-            sb.append("- APK Deep Scan: Permissions, components, native libs\n")
-            sb.append("- DEX Decompiler: Dalvik bytecode decompilation\n")
-            sb.append("- JNI Analyzer: Native method call analysis\n")
-            sb.append("- Frida Generator: Dynamic instrumentation scripts\n")
-            sb.append("- JADX Decompiler: Android Java decompiler\n")
-            sb.append("- Apktool Engine: APK reverse engineering\n")
-            sb.append("- Objection Tool: Runtime mobile exploration\n")
-            sb.append("- MobSF Scanner: Mobile security framework\n")
-            sb.append("- Heresy React Native: React Native analysis and deobfuscation\n")
-            sb.append("- ReFlutter SSL: Flutter SSL pinning bypass tool\n")
-            sb.append("- IDA ObjC Types: Objective-C/iOS type parser for IDA (PoomSmart)\n\n")
-
-            // Network (4 plugins)
-            sb.append("**Network (4):**\n")
-            sb.append("- Network Analyzer: URLs, protocols, SSL pinning\n")
-            sb.append("- Wireshark Analyzer: PCAP and traffic analysis\n")
-            sb.append("- Burp/ZAP Proxy: Web interception proxy\n")
-            sb.append("- BPFroid Trace: eBPF Android syscall tracer (yanivagman)\n\n")
-
-            // Debuggers (6 plugins)
-            sb.append("**Debuggers (6):**\n")
-            sb.append("- x64dbg Bridge: Windows user-mode debugger\n")
-            sb.append("- OllyDbg Debugger: Legacy 32-bit debugger\n")
-            sb.append("- Immunity Debugger: Exploit development debugger\n")
-            sb.append("- WinDbg Analyzer: Windows kernel debugger\n")
-            sb.append("- GDB/LLDB Bridge: GNU and LLVM debugger bridge\n")
-            sb.append("- eDBG eBPF: eBPF-based kernel debugger (shinoLeah)\n\n")
-
-            // Emulation (4 plugins)
-            sb.append("**Emulation (4):**\n")
-            sb.append("- Unicorn Emulator: CPU emulation framework\n")
-            sb.append("- Unidbg Engine: Android native emulation\n")
-            sb.append("- Qiling Engine: Advanced binary emulation\n")
-            sb.append("- DynamoRIO/Pin: Dynamic binary instrumentation\n\n")
-
-            // Symbolic Execution (3 plugins)
-            sb.append("**Symbolic Execution (3):**\n")
-            sb.append("- Angr Framework: Python binary analysis platform\n")
-            sb.append("- Manticore SE: Symbolic execution tool\n")
-            sb.append("- Triton Engine: Dynamic binary analysis\n\n")
-
-            // Utilities (3 plugins)
-            sb.append("**Utilities (3):**\n")
-            sb.append("- QBDI Tracer: Dynamic binary instrumentation tracer\n")
-            sb.append("- BinSync Collab: Reverse engineering collaboration\n")
-            sb.append("- String Extractor: All strings with categorization\n\n")
-
-            sb.append("Just type what you want to analyze!")
-            return sb.toString()
-        }
-
-        // When plugin results are present
-        if (pluginResults.isNotEmpty()) {
-            sb.append("Based on the automated analysis above, I've identified several areas of interest. ")
-            sb.append("The analysis used ").append(pluginResults.size).append(" plugin(s) based on your query keywords.\n\n")
-            sb.append("Would you like me to:\n")
-            sb.append("- **Deep dive** into specific findings?\n")
-            sb.append("- **Explain** what the results mean?\n")
-            sb.append("- **Suggest** next steps or tools?\n")
-            sb.append("- **Generate** exploit/script code?")
-            return sb.toString()
-        }
-
-        // Default response
-        sb.append("I'm analyzing your request...\n\n")
-        sb.append("To provide the best assistance, could you clarify:\n")
-        sb.append("- What **type of file** are you analyzing? (ELF, APK, DEX, etc.)\n")
-        sb.append("- What **specific information** do you need?\n")
-        sb.append("- Are you looking for **vulnerabilities**, **structure**, or **behavior**?\n\n")
-        sb.append("Or type **'help'** to see all available capabilities.")
-
+        sb.append(generateAiResponse(userMsg, context))
         return sb.toString()
     }
 
     /**
-     * Get history
+     * Simulated AI response
      */
-    fun getHistory(limit: Int = 100): List<ChatMessage> = db.getRecentMessages(limit)
+    private fun generateAiResponse(userMsg: String, context: List<ChatMessage>): String {
+        val lowerMsg = userMsg.lowercase(Locale.getDefault())
 
-    /**
-     * Clear history
-     */
-    fun clearHistory() = db.clearAll()
-
-    /**
-     * SQLite database
-     */
-    class ChatDatabase(context: Context) : SQLiteOpenHelper(context, "hermes_chat.db", null, 1) {
-
-        override fun onCreate(db: SQLiteDatabase) {
-            db.execSQL("""
-                CREATE TABLE messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    timestamp INTEGER DEFAULT 0,
-                    plugin_used TEXT
-                )
-            """)
-            // Create index
-            db.execSQL("CREATE INDEX idx_timestamp ON messages(timestamp)")
+        if (lowerMsg.contains("help") || lowerMsg.contains("?") || lowerMsg.contains("list") || lowerMsg.contains("menu")) {
+            return buildString {
+                append("## Hermes Analyzer - AI Assistant\n\n")
+                append("### Available Plugin Categories:\n\n")
+                append("**Binary Analysis (14 plugins):**\n")
+                append("- ELF Analyzer, DEX Decompiler, String Extractor, Capstone Disassembler\n")
+                append("- Binary Ninja, Ghidra Analyzer, Cutter, JADX, dnSpy\n")
+                append("- CAPA+FLOSS, Detect It Easy, PE-bear, BinDiff, APKTool\n\n")
+                append("**Security (6 plugins):**\n")
+                append("- YARA Scanner, Vuln Scanner, Crypto Hunter, Quark Engine, MobSF Scanner, Coruna iOS\n\n")
+                append("**Android (11 plugins):**\n")
+                append("- APK Deep Scan, DEX Decompiler, JNI Analyzer, Frida Generator\n")
+                append("- JADX, APKTool, Objection, MobSF, heresy RN, reFlutter, IDAObjcTypes\n\n")
+                append("**Network (4 plugins):**\n")
+                append("- Network Analyzer, Wireshark, Burp/ZAP, BPFroid\n\n")
+                append("**Debugger (6 plugins):**\n")
+                append("- x64dbg, OllyDbg, Immunity, WinDbg, GDB/LLDB, eDBG\n\n")
+                append("**Emulation (4 plugins):**\n")
+                append("- Unicorn, Unidbg, Qiling, DynamoRIO\n\n")
+                append("**Symbolic Execution (3 plugins):**\n")
+                append("- angr, Manticore, Triton\n\n")
+                append("**Utilities (4 plugins):**\n")
+                append("- QBDI Tracer, BinSync Collaboration, ImHex Editor, Ghidra FOX\n\n")
+                append("### 8 AI Platforms:\n")
+                append("OpenAI, Kimi, Qwen, Gemini, Claude, DeepSeek, Ollama, Suprninja\n\n")
+                append("Plugins trigger automatically based on keywords. Just describe your goal!")
+            }
         }
 
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+        if (lowerMsg.contains("agent") || lowerMsg.contains("auto") || lowerMsg.contains("plan")) {
+            return buildString {
+                append("## Autonomous Agent Mode\n\n")
+                append("I can create multi-step analysis plans and execute tools in parallel.\n\n")
+                append("**Example commands:**\n")
+                append("- \"Comprehensive security audit of this APK\"\n")
+                append("- \"Reverse engineer the crypto and network logic\"\n")
+                append("- \"Full malware analysis with string extraction\"\n\n")
+                append("The agent will:\n")
+                append("1. Analyze your goal\n")
+                append("2. Select relevant tools\n")
+                append("3. Execute in parallel groups\n")
+                append("4. Evaluate results and add more tools if needed\n")
+                append("5. Generate a comprehensive report\n\n")
+                append("**API Keys saved for: ").append(getActiveAiPlatforms().joinToString(", ") ?: "None").append("**")
+            }
+        }
+
+        // Check active AI platforms
+        val activePlatforms = getActiveAiPlatforms()
+        if (activePlatforms.isEmpty()) {
+            return buildString {
+                append("**No AI API keys configured.**\n\n")
+                append("Please set up API keys for at least one platform:\n")
+                append("- OpenAI (GPT-4)\n")
+                append("- Kimi (Moonshot AI)\n")
+                append("- Qwen (Alibaba)\n")
+                append("- Gemini (Google)\n")
+                append("- Claude (Anthropic)\n")
+                append("- DeepSeek\n")
+                append("- Ollama (local)\n")
+                append("- Suprninja\n\n")
+                append("Go to Settings > AI API Keys to configure.")
+            }
+        }
+
+        return buildString {
+            append("Hermes AI (using: ").append(activePlatforms.joinToString(", ") { getPlatformDisplayName(it) })
+            append(")\n\n")
+            append("**Context**: ").append(context.size).append(" messages in memory\n")
+            append("**Active platforms**: ").append(activePlatforms.size).append("/8\n\n")
+            append("Enter a file path and describe your analysis goal.\n")
+            append("I'll auto-select tools and run them in parallel to achieve it!")
+        }
+    }
+
+    fun getHistory(): List<ChatMessage> {
+        return db.getRecentMessages(100)
+    }
+
+    fun clearHistory() {
+        db.clearMessages()
+    }
+
+    // ============================================================
+    // DATABASE
+    // ============================================================
+
+    class ChatDatabase(context: Context) : SQLiteOpenHelper(context, "hermes_chat.db", null, 2) {
+
+        override fun onCreate(db: SQLiteDatabase) {
+            db.execSQL("CREATE TABLE messages (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "role TEXT, " +
+                "content TEXT, " +
+                "timestamp INTEGER, " +
+                "plugin_used TEXT)")
+        }
+
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion < 2) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN plugin_used TEXT")
+            }
+        }
 
         fun saveMessage(role: String, content: String, pluginUsed: String? = null) {
             val db = writableDatabase
-            db.execSQL(
-                "INSERT INTO messages (role, content, timestamp, plugin_used) VALUES (?, ?, ?, ?)",
-                arrayOf(role, content, System.currentTimeMillis(), pluginUsed)
-            )
+            val values = android.content.ContentValues()
+            values.put("role", role)
+            values.put("content", content)
+            values.put("timestamp", System.currentTimeMillis())
+            values.put("plugin_used", pluginUsed)
+            db.insert("messages", null, values)
         }
 
         fun getRecentMessages(limit: Int): List<ChatMessage> {
-            val list = mutableListOf<ChatMessage>()
+            val messages = mutableListOf<ChatMessage>()
             val db = readableDatabase
-            val cursor = db.rawQuery(
-                "SELECT id, role, content, timestamp, plugin_used FROM messages ORDER BY timestamp DESC LIMIT ?",
-                arrayOf(limit.toString())
+            val cursor = db.query(
+                "messages", null, null, null, null, null,
+                "timestamp DESC", limit.toString()
             )
-            while (cursor.moveToNext()) {
-                list.add(ChatMessage(
-                    id = cursor.getLong(0),
-                    role = cursor.getString(1),
-                    content = cursor.getString(2),
-                    timestamp = cursor.getLong(3),
-                    pluginUsed = cursor.getString(4)
-                ))
+            if (cursor.moveToFirst()) {
+                do {
+                    messages.add(ChatMessage(
+                        id = cursor.getLong(cursor.getColumnIndexOrThrow("id")),
+                        role = cursor.getString(cursor.getColumnIndexOrThrow("role")),
+                        content = cursor.getString(cursor.getColumnIndexOrThrow("content")),
+                        timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")),
+                        pluginUsed = cursor.getString(cursor.getColumnIndexOrThrow("plugin_used"))
+                    ))
+                } while (cursor.moveToNext())
             }
             cursor.close()
-            return list.reversed()
+            return messages.reversed()
         }
 
-        fun clearAll() {
-            writableDatabase.execSQL("DELETE FROM messages")
+        fun clearMessages() {
+            writableDatabase.delete("messages", null, null)
         }
     }
 }
