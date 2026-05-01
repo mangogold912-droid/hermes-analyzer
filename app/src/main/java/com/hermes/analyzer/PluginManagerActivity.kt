@@ -4,10 +4,11 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
-import com.hermes.analyzer.utils.PluginEngine
+import com.hermes.analyzer.ai.PluginEngine
 
 class PluginManagerActivity : AppCompatActivity() {
 
