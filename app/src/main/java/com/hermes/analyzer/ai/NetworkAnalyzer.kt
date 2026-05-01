@@ -6,6 +6,6 @@ import kotlinx.coroutines.withContext
 
 class NetworkAnalyzer(private val context: Context) {
     suspend fun analyze(filePath: String): String = withContext(Dispatchers.IO) {
-        "Network analysis of $filePath: No hardcoded endpoints detected in stub mode."
+        "Network analysis of " + filePath + ": No hardcoded endpoints detected in stub mode."
     }
 }
