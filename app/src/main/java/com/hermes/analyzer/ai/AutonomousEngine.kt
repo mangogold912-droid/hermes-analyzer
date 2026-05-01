@@ -343,13 +343,13 @@ class AutonomousEngine(private val context: Context) {
             "network_analyze" -> {
                 description = "네트워크 엔드포인트 분석 (하드코딩된 서버 주소 탐지)"
                 if (filePath != null) {
-                    commands.add("file "$filePath"")
-                    commands.add("strings "$filePath" | grep -oE 'https?://[^\s<>"{}|^`\[\]]+' | sort -u | head -20")
-                    commands.add("strings "$filePath" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?' | sort -u | head -20")
-                    commands.add("strings "$filePath" | grep -oE '[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:[0-9]+)?' | sort -u | head -30")
-                    commands.add("strings "$filePath" | grep -iE 'api[_-]?key|token|secret|auth|bearer|cookie|session' | head -20")
-                    commands.add("strings "$filePath" | grep -iE 'curl|wget|fetch|okhttp|retrofit|socket|connect|bind|send|recv' | head -20")
-                    commands.add("strings "$filePath" | grep -iE 'websocket|ws://|wss://|mqtt|grpc|protobuf' | head -10")
+                    commands.add("file "" + filePath + """)
+                    commands.add("strings "" + filePath + "" | grep -oE 'https?://[^\s<>"{}|^`\[\]]+' | sort -u | head -20")
+                    commands.add("strings "" + filePath + "" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?' | sort -u | head -20")
+                    commands.add("strings "" + filePath + "" | grep -oE '[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:[0-9]+)?' | sort -u | head -30")
+                    commands.add("strings "" + filePath + "" | grep -iE 'api[_-]?key|token|secret|auth|bearer|cookie|session' | head -20")
+                    commands.add("strings "" + filePath + "" | grep -iE 'curl|wget|fetch|okhttp|retrofit|socket|connect|bind|send|recv' | head -20")
+                    commands.add("strings "" + filePath + "" | grep -iE 'websocket|ws://|wss://|mqtt|grpc|protobuf' | head -10")
                     expected = "하드코딩된 URL, IP, 도메인, API 키, 네트워크 라이브러리 참조"
                 } else {
                     commands.add("echo '네트워크 분석할 파일을 업로드해 주세요.'")
@@ -360,13 +360,13 @@ class AutonomousEngine(private val context: Context) {
             "deobfuscate" -> {
                 description = "난독화 탐지 및 해제 (Control Flow, String Obfuscation, Packing)"
                 if (filePath != null) {
-                    commands.add("file "$filePath"")
-                    commands.add("strings "$filePath" | grep -iE 'upx|themida|vmprotect|packer|protect|obfusc|compress|crypt' | head -20")
-                    commands.add("strings "$filePath" | grep -iE 'obfuscator|ollvm|fla|sub|bcf|flatten|dispatcher' | head -20")
-                    commands.add("strings "$filePath" | grep -iE 'proguard|R8|dexguard|shrink|minify|mapping' | head -15")
-                    commands.add("xxd -l 512 "$filePath"")
-                    commands.add("strings "$filePath" | grep -oE '[A-Za-z0-9+/]{40,}={0,2}' | head -20")
-                    commands.add("strings "$filePath" | grep -oE '[0-9a-fA-F]{32,}' | head -20")
+                    commands.add("file "" + filePath + """)
+                    commands.add("strings "" + filePath + "" | grep -iE 'upx|themida|vmprotect|packer|protect|obfusc|compress|crypt' | head -20")
+                    commands.add("strings "" + filePath + "" | grep -iE 'obfuscator|ollvm|fla|sub|bcf|flatten|dispatcher' | head -20")
+                    commands.add("strings "" + filePath + "" | grep -iE 'proguard|R8|dexguard|shrink|minify|mapping' | head -15")
+                    commands.add("xxd -l 512 "" + filePath + """)
+                    commands.add("strings "" + filePath + "" | grep -oE '[A-Za-z0-9+/]{40,}={0,2}' | head -20")
+                    commands.add("strings "" + filePath + "" | grep -oE '[0-9a-fA-F]{32,}' | head -20")
                     expected = "패커 시그니처, 난독화 흔적, Base64/hex 문자열, 제어 흐름 징후"
                 } else {
                     commands.add("echo '난독화 분석할 파일을 업로드해 주세요.'")
