@@ -42,7 +42,7 @@ class ReverseEngineeringPipeline(private val context: Context) {
         val stageName: String,
         val success: Boolean,
         val output: String,
-        keyFindings: List<String>
+        val keyFindings: List<String>
     )
 
     /**
@@ -257,3 +257,4 @@ class ReverseEngineeringPipeline(private val context: Context) {
         return out
     }
 }
+
