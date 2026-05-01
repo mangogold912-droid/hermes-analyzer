@@ -1359,6 +1359,45 @@ class AdvancedAIEngine(private val context: Context) {
             else -> "binary"
         }
     }
+
+
+    // ==================== PUBLIC API FOR COGNITIVE & REINFORCEMENT ====================
+
+    /** Delegate: Infer user intent from message */
+    fun inferIntent(message: String, fileType: String?): AdvancedCognitiveEngine.UserIntent {
+        return cognitive.inferIntent(message, fileType)
+    }
+
+    /** Delegate: Decompose complex goal into hierarchical reasoning tree */
+    fun decomposeGoal(goal: String, fileType: String?): AdvancedCognitiveEngine.ReasoningTree {
+        return cognitive.decomposeGoal(goal, fileType)
+    }
+
+    /** Delegate: Self-reflection on analysis result */
+    fun selfReflect(analysisResult: String, executionTimeMs: Long): AdvancedCognitiveEngine.ReflectionReport {
+        return cognitive.selfReflect(analysisResult, executionTimeMs)
+    }
+
+    /** Delegate: Query working memory / knowledge base */
+    fun queryKnowledge(keyPrefix: String): List<AdvancedCognitiveEngine.KnowledgeEntry> {
+        return cognitive.queryKnowledge(keyPrefix)
+    }
+
+    /** Delegate: Get reinforcement learning strategy report */
+    fun getStrategyReport(): String {
+        return reinforcement.getStrategyReport()
+    }
+
+    /** Get file type from path */
+    fun getFileType(filePath: String): String {
+        val ext = filePath.substringAfterLast('.', "").lowercase()
+        return when (ext) {
+            "apk" -> "apk"
+            "elf", "so", "o" -> "elf"
+            "dex" -> "dex"
+            "jar" -> "jar"
+            "zip" -> "zip"
+            else -> "binary"
+        }
+    }
 }
-
-
