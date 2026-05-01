@@ -414,7 +414,8 @@ class AIAgentChatActivity : AppCompatActivity() {
                     if (engine.saveApiKey(platform, key)) saved++
                 }
             }
-            Toast.makeText(this, "Saved $saved API keys", Toast.LENGTH_SHORT).show()
+            val activePlatforms = engine.getActivePlatforms()
+            Toast.makeText(this, "Saved $saved keys. Active: ${activePlatforms.size} (${activePlatforms.joinToString()})", Toast.LENGTH_LONG).show()
             addSystemMessage("API keys updated. Active: ${engine.getActivePlatforms().joinToString()}")
         }
 
